@@ -34,7 +34,7 @@ export function ProfilePage() {
       .get<{ votes: MyVote[] }>("/votes")
       .then((data) => setVotes(data.votes))
       .catch(() => {
-        // Die Stimmenhistorie ist nur ein Extra - kein Grund fuer eine Fehlermeldung.
+        // Die Stimmenhistorie ist nur ein Extra - kein Grund für eine Fehlermeldung.
       });
   }, []);
 
@@ -100,7 +100,7 @@ export function ProfilePage() {
             <p className="text-sm font-medium">
               {theme === "dark" ? "Dunkles Design" : "Helles Design"}
             </p>
-            <p className="mt-0.5 text-sm muted">Die Auswahl wird auf diesem Geraet gespeichert.</p>
+            <p className="mt-0.5 text-sm muted">Die Auswahl wird auf diesem Gerät gespeichert.</p>
           </div>
           <Button variant="secondary" onClick={toggle}>
             {theme === "dark" ? "☀️ Hell" : "🌙 Dunkel"}
@@ -109,7 +109,7 @@ export function ProfilePage() {
       </section>
 
       <form onSubmit={handleSubmit} className="card space-y-5 p-5 sm:p-6" noValidate>
-        <h2 className="section-title">Daten aendern</h2>
+        <h2 className="section-title">Daten ändern</h2>
         {error && <Alert kind="error">{error}</Alert>}
 
         <div>
@@ -127,9 +127,9 @@ export function ProfilePage() {
         </div>
 
         <fieldset className="space-y-4 border-t border-slate-200 pt-5 dark:border-slate-800">
-          <legend className="sr-only">Passwort aendern</legend>
+          <legend className="sr-only">Passwort ändern</legend>
           <p className="text-sm muted">
-            Passwort aendern? Dann beide Felder ausfuellen - sonst einfach leer lassen.
+            Passwort ändern? Dann beide Felder ausfüllen - sonst einfach leer lassen.
           </p>
 
           <div>

@@ -1,9 +1,9 @@
-/** Kollisionsarme, URL-sichere IDs. crypto.randomUUID ist auf Workers verfuegbar. */
+/** Kollisionsarme, URL-sichere IDs. crypto.randomUUID ist auf Workers verfügbar. */
 export function newId(): string {
   return crypto.randomUUID();
 }
 
-/** Zufalls-Token fuer Session-Cookies (128 Bit, base64url). */
+/** Zufalls-Token für Session-Cookies (128 Bit, base64url). */
 export function newToken(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   let binary = "";

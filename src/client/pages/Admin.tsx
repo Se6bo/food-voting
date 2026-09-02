@@ -39,7 +39,7 @@ interface Stats {
 type Tab = "overview" | "users" | "meals" | "polls" | "settings";
 
 const TABS: Array<{ id: Tab; label: string }> = [
-  { id: "overview", label: "Ueberblick" },
+  { id: "overview", label: "Überblick" },
   { id: "users", label: "Benutzer" },
   { id: "meals", label: "Essen" },
   { id: "polls", label: "Abstimmungen" },
@@ -86,7 +86,7 @@ function UsersTab() {
       setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, role } : u)));
       toast.success(`${user.name} ist jetzt ${role === "admin" ? "Administrator" : "Benutzer"}.`);
     } catch (err) {
-      toast.error(err instanceof ApiRequestError ? err.message : "Die Rolle konnte nicht geaendert werden.");
+      toast.error(err instanceof ApiRequestError ? err.message : "Die Rolle konnte nicht geändert werden.");
     }
   }
 
@@ -96,10 +96,10 @@ function UsersTab() {
     try {
       await api.delete(`/admin/users/${deleting.id}`);
       setUsers((prev) => prev.filter((u) => u.id !== deleting.id));
-      toast.success(`${deleting.name} wurde geloescht.`);
+      toast.success(`${deleting.name} wurde gelöscht.`);
       setDeleting(null);
     } catch (err) {
-      toast.error(err instanceof ApiRequestError ? err.message : "Der Benutzer konnte nicht geloescht werden.");
+      toast.error(err instanceof ApiRequestError ? err.message : "Der Benutzer konnte nicht gelöscht werden.");
     } finally {
       setBusy(false);
     }
@@ -150,7 +150,7 @@ function UsersTab() {
                     disabled={user.id === me?.id}
                     className="text-red-600 dark:text-red-400"
                   >
-                    Loeschen
+                    Löschen
                   </Button>
                 </td>
               </tr>
@@ -188,7 +188,7 @@ function UsersTab() {
                 disabled={user.id === me?.id}
                 className="text-red-600 dark:text-red-400"
               >
-                Loeschen
+                Löschen
               </Button>
             </div>
           </div>
@@ -197,8 +197,8 @@ function UsersTab() {
 
       <ConfirmDialog
         open={deleting !== null}
-        title="Benutzer loeschen"
-        message={`Soll ${deleting?.name} wirklich geloescht werden? Die angelegten Essen bleiben erhalten, Stimmen werden entfernt.`}
+        title="Benutzer löschen"
+        message={`Soll ${deleting?.name} wirklich gelöscht werden? Die angelegten Essen bleiben erhalten, Stimmen werden entfernt.`}
         onConfirm={confirmDelete}
         onCancel={() => setDeleting(null)}
         busy={busy}
@@ -228,10 +228,10 @@ function MealsTab() {
     try {
       await api.delete(`/meals/${deleting.id}`);
       setMeals((prev) => prev.filter((meal) => meal.id !== deleting.id));
-      toast.success(`"${deleting.name}" wurde geloescht.`);
+      toast.success(`"${deleting.name}" wurde gelöscht.`);
       setDeleting(null);
     } catch (err) {
-      toast.error(err instanceof ApiRequestError ? err.message : "Das Essen konnte nicht geloescht werden.");
+      toast.error(err instanceof ApiRequestError ? err.message : "Das Essen konnte nicht gelöscht werden.");
     } finally {
       setBusy(false);
     }
@@ -256,7 +256,7 @@ function MealsTab() {
                 Bearbeiten
               </Link>
               <Button variant="ghost" className="text-red-600 dark:text-red-400" onClick={() => setDeleting(meal)}>
-                Loeschen
+                Löschen
               </Button>
             </div>
           </div>
@@ -265,8 +265,8 @@ function MealsTab() {
 
       <ConfirmDialog
         open={deleting !== null}
-        title="Essen loeschen"
-        message={`Soll "${deleting?.name}" wirklich geloescht werden? Zugehoerige Planungen und Stimmen verschwinden ebenfalls.`}
+        title="Essen löschen"
+        message={`Soll "${deleting?.name}" wirklich gelöscht werden? Zugehörige Planungen und Stimmen verschwinden ebenfalls.`}
         onConfirm={confirmDelete}
         onCancel={() => setDeleting(null)}
         busy={busy}
@@ -299,9 +299,9 @@ function PollsTab() {
             : p,
         ),
       );
-      toast.success(next ? "Abstimmung wurde geoeffnet." : "Abstimmung wurde geschlossen.");
+      toast.success(next ? "Abstimmung wurde geöffnet." : "Abstimmung wurde geschlossen.");
     } catch (err) {
-      toast.error(err instanceof ApiRequestError ? err.message : "Die Aenderung war nicht moeglich.");
+      toast.error(err instanceof ApiRequestError ? err.message : "Die Änderung war nicht möglich.");
     }
   }
 
@@ -330,7 +330,7 @@ function PollsTab() {
             </p>
           </div>
           <Button variant="secondary" onClick={() => toggleOpen(poll)}>
-            {poll.adminOpen ? "Schliessen" : "Oeffnen"}
+            {poll.adminOpen ? "Schließen" : "Öffnen"}
           </Button>
         </div>
       ))}
@@ -425,7 +425,7 @@ function SettingsTab() {
           }
         />
         <p className="mt-1.5 text-sm muted">
-          Standard 23 - abstimmen ist dann bis {settings.voteDeadlineHour}:59 Uhr am Vorabend moeglich.
+          Standard 23 - abstimmen ist dann bis {settings.voteDeadlineHour}:59 Uhr am Vorabend möglich.
         </p>
         {fields.voteDeadlineHour && <p className="field-error">{fields.voteDeadlineHour}</p>}
       </div>
@@ -440,7 +440,7 @@ function SettingsTab() {
         <span>
           <span className="block text-sm font-medium">Registrierung offen</span>
           <span className="block text-sm muted">
-            Ist das deaktiviert, koennen sich keine neuen Benutzer mehr anmelden.
+            Ist das deaktiviert, können sich keine neuen Benutzer mehr anmelden.
           </span>
         </span>
       </label>

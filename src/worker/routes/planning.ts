@@ -22,7 +22,7 @@ interface PlannedRow {
 }
 
 /**
- * Laedt geplante Tage inklusive Abstimmungsergebnis und Zutaten.
+ * Lädt geplante Tage inklusive Abstimmungsergebnis und Zutaten.
  * Die Deadline wird hier - und nur hier - serverseitig ausgewertet.
  */
 export async function loadPlannedDays(
@@ -105,7 +105,7 @@ const planning = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 planning.use("*", requireAuth);
 
 /**
- * Essensplan. Standardmaessig ab heute bis `planningDaysAhead` Tage in die
+ * Essensplan. Standardmäßig ab heute bis `planningDaysAhead` Tage in die
  * Zukunft; mit `?from=&to=` kann ein eigener Zeitraum geladen werden.
  */
 planning.get("/", async (c) => {
@@ -132,15 +132,15 @@ planning.post("/", async (c) => {
 
   const date = requireString(body.date, "date", { max: 10, label: "Datum" });
   if (!isValidIsoDate(date)) {
-    throw new ValidationError("Ungueltiges Datum.", { date: "Bitte waehle ein gueltiges Datum." });
+    throw new ValidationError("Ungültiges Datum.", { date: "Bitte wähle ein gültiges Datum." });
   }
   const mealId = requireString(body.mealId, "mealId", { max: 64, label: "Essen" });
 
   const today = todayInZone();
-  // Nur Admins duerfen die Vergangenheit umschreiben.
+  // Nur Admins dürfen die Vergangenheit umschreiben.
   if (date < today && user.role !== "admin") {
     throw new ValidationError("Datum liegt in der Vergangenheit.", {
-      date: "Du kannst nur fuer heute oder spaeter planen.",
+      date: "Du kannst nur für heute oder später planen.",
     });
   }
 
@@ -148,7 +148,7 @@ planning.post("/", async (c) => {
     .bind(mealId)
     .first<{ id: string }>();
   if (!meal) {
-    throw new ValidationError("Unbekanntes Essen.", { mealId: "Bitte waehle ein vorhandenes Essen." });
+    throw new ValidationError("Unbekanntes Essen.", { mealId: "Bitte wähle ein vorhandenes Essen." });
   }
 
   const existing = await c.env.DB.prepare("SELECT id, meal_id FROM meal_days WHERE date = ?")
@@ -159,11 +159,11 @@ planning.post("/", async (c) => {
     if (existing.meal_id === mealId) {
       return c.json({ ok: true, changed: false });
     }
-    // Nur Admins duerfen eine bestehende Planung ueberschreiben - sonst
-    // koennte jemand eine laufende Abstimmung unter den Fuessen wegziehen.
+    // Nur Admins dürfen eine bestehende Planung überschreiben - sonst
+    // könnte jemand eine laufende Abstimmung unter den Füßen wegziehen.
     if (user.role !== "admin") {
       return c.json(
-        { error: "Fuer diesen Tag ist bereits ein Essen geplant. Das kann nur ein Admin aendern." },
+        { error: "Für diesen Tag ist bereits ein Essen geplant. Das kann nur ein Admin ändern." },
         403,
       );
     }
@@ -184,7 +184,7 @@ planning.post("/", async (c) => {
 planning.delete("/:id", async (c) => {
   const user = currentUser(c);
   if (user.role !== "admin") {
-    return c.json({ error: "Nur Admins koennen den Essensplan aendern." }, 403);
+    return c.json({ error: "Nur Admins können den Essensplan ändern." }, 403);
   }
   const result = await c.env.DB.prepare("DELETE FROM meal_days WHERE id = ?")
     .bind(c.req.param("id"))

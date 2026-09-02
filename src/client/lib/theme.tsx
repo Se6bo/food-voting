@@ -28,7 +28,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem("theme", theme);
     } catch {
-      // Nicht kritisch: die Auswahl gilt dann nur fuer diese Sitzung.
+      // Nicht kritisch: die Auswahl gilt dann nur für diese Sitzung.
     }
   }, [theme]);
 

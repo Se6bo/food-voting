@@ -8,7 +8,7 @@ import { ValidationError, requireString } from "../lib/validation";
 
 const admin = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
-// Jede Admin-Route liegt hinter der serverseitigen Rollenpruefung.
+// Jede Admin-Route liegt hinter der serverseitigen Rollenprüfung.
 admin.use("*", requireAdmin);
 
 // ---------------------------------------------------------------------------
@@ -45,7 +45,7 @@ admin.get("/users", async (c) => {
   });
 });
 
-/** Zaehlt die verbleibenden Admins - schuetzt vor dem "letzten Admin"-Problem. */
+/** Zählt die verbleibenden Admins - schützt vor dem "letzten Admin"-Problem. */
 async function adminCount(c: { env: Env }): Promise<number> {
   const row = await c.env.DB.prepare("SELECT COUNT(*) AS count FROM users WHERE role = 'admin'").first<{
     count: number;
@@ -60,7 +60,7 @@ admin.put("/users/:id", async (c) => {
   const role = body.role;
 
   if (role !== "user" && role !== "admin") {
-    throw new ValidationError("Ungueltige Rolle.", { role: "Rolle muss 'user' oder 'admin' sein." });
+    throw new ValidationError("Ungültige Rolle.", { role: "Rolle muss 'user' oder 'admin' sein." });
   }
 
   const target = await c.env.DB.prepare("SELECT id, role FROM users WHERE id = ?")
@@ -71,7 +71,7 @@ admin.put("/users/:id", async (c) => {
 
   // Sich selbst degradieren ist erlaubt, solange noch ein anderer Admin bleibt.
   if (target.role === "admin" && role === "user" && (await adminCount(c)) <= 1) {
-    return c.json({ error: "Es muss mindestens ein Admin uebrig bleiben." }, 409);
+    return c.json({ error: "Es muss mindestens ein Admin übrig bleiben." }, 409);
   }
 
   await c.env.DB.prepare("UPDATE users SET role = ? WHERE id = ?").bind(role, id).run();
@@ -87,7 +87,7 @@ admin.delete("/users/:id", async (c) => {
   const id = c.req.param("id");
 
   if (id === actor.id) {
-    return c.json({ error: "Du kannst dein eigenes Konto hier nicht loeschen." }, 409);
+    return c.json({ error: "Du kannst dein eigenes Konto hier nicht löschen." }, 409);
   }
 
   const target = await c.env.DB.prepare("SELECT role FROM users WHERE id = ?")
@@ -95,7 +95,7 @@ admin.delete("/users/:id", async (c) => {
     .first<{ role: "user" | "admin" }>();
   if (!target) return c.json({ error: "Dieser Benutzer existiert nicht mehr." }, 404);
   if (target.role === "admin" && (await adminCount(c)) <= 1) {
-    return c.json({ error: "Es muss mindestens ein Admin uebrig bleiben." }, 409);
+    return c.json({ error: "Es muss mindestens ein Admin übrig bleiben." }, 409);
   }
 
   // Essen bleiben erhalten (created_by wird zu NULL), Stimmen und Sessions
@@ -156,12 +156,12 @@ admin.get("/votes", async (c) => {
   });
 });
 
-/** Abstimmung manuell schliessen oder wieder oeffnen. */
+/** Abstimmung manuell schließen oder wieder öffnen. */
 admin.put("/votes/:id", async (c) => {
   const id = c.req.param("id");
   const body = await c.req.json().catch(() => ({}));
   if (typeof body.open !== "boolean") {
-    throw new ValidationError("Ungueltiger Wert.", { open: "Ungueltiger Wert." });
+    throw new ValidationError("Ungültiger Wert.", { open: "Ungültiger Wert." });
   }
 
   const result = await c.env.DB.prepare("UPDATE meal_days SET voting_open = ? WHERE id = ?")
@@ -207,23 +207,23 @@ admin.put("/settings", async (c) => {
   if (body.planningDaysAhead !== undefined) {
     const days = Number(body.planningDaysAhead);
     if (!Number.isInteger(days) || days < 1 || days > 60) {
-      throw new ValidationError("Ungueltiger Zeitraum.", {
-        planningDaysAhead: "Bitte einen Wert zwischen 1 und 60 Tagen waehlen.",
+      throw new ValidationError("Ungültiger Zeitraum.", {
+        planningDaysAhead: "Bitte einen Wert zwischen 1 und 60 Tagen wählen.",
       });
     }
     patch.planningDaysAhead = days;
   }
   if (body.registrationOpen !== undefined) {
     if (typeof body.registrationOpen !== "boolean") {
-      throw new ValidationError("Ungueltiger Wert.", { registrationOpen: "Ungueltiger Wert." });
+      throw new ValidationError("Ungültiger Wert.", { registrationOpen: "Ungültiger Wert." });
     }
     patch.registrationOpen = body.registrationOpen;
   }
   if (body.voteDeadlineHour !== undefined) {
     const hour = Number(body.voteDeadlineHour);
     if (!Number.isInteger(hour) || hour < 0 || hour > 23) {
-      throw new ValidationError("Ungueltige Uhrzeit.", {
-        voteDeadlineHour: "Bitte eine Stunde zwischen 0 und 23 waehlen.",
+      throw new ValidationError("Ungültige Uhrzeit.", {
+        voteDeadlineHour: "Bitte eine Stunde zwischen 0 und 23 wählen.",
       });
     }
     patch.voteDeadlineHour = hour;
@@ -233,7 +233,7 @@ admin.put("/settings", async (c) => {
   return c.json({ settings: await getSettings(c.env) });
 });
 
-/** Kennzahlen fuer das Admin-Dashboard. */
+/** Kennzahlen für das Admin-Dashboard. */
 admin.get("/stats", async (c) => {
   const today = todayInZone();
   const row = await c.env.DB.prepare(

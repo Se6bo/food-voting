@@ -76,7 +76,7 @@ async function syncGeneratedItems(
       current.unit !== item.unit ||
       current.name !== item.name
     ) {
-      // Der Plan hat sich geaendert -> Menge aktualisieren, Haken behalten.
+      // Der Plan hat sich geändert -> Menge aktualisieren, Haken behalten.
       statements.push(
         env.DB.prepare("UPDATE shopping_items SET name = ?, amount = ?, unit = ? WHERE source_key = ?")
           .bind(item.name, item.amount, item.unit, item.key),
@@ -159,7 +159,7 @@ shopping.put("/:id", async (c) => {
   const id = c.req.param("id");
   const body = await c.req.json().catch(() => ({}));
   if (typeof body.checked !== "boolean") {
-    throw new ValidationError("Ungueltiger Wert.", { checked: "Ungueltiger Wert." });
+    throw new ValidationError("Ungültiger Wert.", { checked: "Ungültiger Wert." });
   }
 
   const result = await c.env.DB.prepare(
@@ -175,8 +175,8 @@ shopping.put("/:id", async (c) => {
 });
 
 /**
- * Loeschen: manuelle Artikel verschwinden ganz, generierte werden nur
- * ausgeblendet - sonst waeren sie beim naechsten Laden sofort wieder da.
+ * Löschen: manuelle Artikel verschwinden ganz, generierte werden nur
+ * ausgeblendet - sonst wären sie beim nächsten Laden sofort wieder da.
  */
 shopping.delete("/:id", async (c) => {
   const id = c.req.param("id");
@@ -195,7 +195,7 @@ shopping.delete("/:id", async (c) => {
   return c.json({ ok: true });
 });
 
-/** "Erledigte loeschen" - raeumt alle abgehakten Positionen weg. */
+/** "Erledigte löschen" - räumt alle abgehakten Positionen weg. */
 shopping.post("/clear-checked", async (c) => {
   await c.env.DB.batch([
     c.env.DB.prepare("DELETE FROM shopping_items WHERE checked = 1 AND is_manual = 1"),
@@ -204,7 +204,7 @@ shopping.post("/clear-checked", async (c) => {
   return c.json({ ok: true });
 });
 
-/** Liste vollstaendig neu aufbauen: Haken zuruecksetzen, Ausgeblendetes zurueckholen. */
+/** Liste vollständig neu aufbauen: Haken zurücksetzen, Ausgeblendetes zurückholen. */
 shopping.post("/reset", async (c) => {
   await c.env.DB.prepare(
     "UPDATE shopping_items SET hidden = 0, checked = 0, checked_by = NULL, checked_at = NULL WHERE is_manual = 0",

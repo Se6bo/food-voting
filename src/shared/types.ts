@@ -6,7 +6,7 @@
 
 export type Role = "user" | "admin";
 
-/** Vote-Werte: 1 = Ja / gefaellt mir, -1 = Nein. */
+/** Vote-Werte: 1 = Ja / gefällt mir, -1 = Nein. */
 export type VoteValue = 1 | -1;
 
 export interface PublicUser {
@@ -41,7 +41,7 @@ export interface Meal {
   createdAt: string;
   updatedAt: string;
   ingredients: Ingredient[];
-  /** Darf der aktuelle Benutzer dieses Essen bearbeiten/loeschen? */
+  /** Darf der aktuelle Benutzer dieses Essen bearbeiten/löschen? */
   canEdit: boolean;
 }
 
@@ -67,7 +67,7 @@ export interface PlannedDay {
   myVote: VoteValue | null;
   /** Serverseitig berechnet - der Client entscheidet das nie selbst. */
   votingOpen: boolean;
-  /** Warum die Abstimmung geschlossen ist (fuer verstaendliche UI-Texte). */
+  /** Warum die Abstimmung geschlossen ist (für verständliche UI-Texte). */
   closedReason: "past" | "deadline" | "admin" | null;
   /** ISO-Zeitpunkt, bis zu dem abgestimmt werden darf. */
   deadline: string;
@@ -95,6 +95,6 @@ export interface AppSettings {
 
 export interface ApiError {
   error: string;
-  /** Feldbezogene Validierungsfehler fuer Formulare. */
+  /** Feldbezogene Validierungsfehler für Formulare. */
   fields?: Record<string, string>;
 }

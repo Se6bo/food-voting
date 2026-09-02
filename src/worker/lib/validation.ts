@@ -1,6 +1,6 @@
 /**
- * Kleine, abhaengigkeitsfreie Validierungshelfer. Bewusst kein zod: der MVP
- * braucht nur wenige Regeln und wir sparen uns Bundle-Groesse.
+ * Kleine, abhängigkeitsfreie Validierungshelfer. Bewusst kein zod: der MVP
+ * braucht nur wenige Regeln und wir sparen uns Bundle-Größe.
  */
 
 export class ValidationError extends Error {
@@ -29,7 +29,7 @@ export function requireString(
   }
   if (trimmed.length > max) {
     throw new ValidationError(`${label} ist zu lang.`, {
-      [field]: `${label} darf hoechstens ${max} Zeichen haben.`,
+      [field]: `${label} darf höchstens ${max} Zeichen haben.`,
     });
   }
   return trimmed;
@@ -48,8 +48,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 export function requireEmail(value: unknown): string {
   const email = requireString(value, "email", { max: 254, label: "E-Mail-Adresse" });
   if (!EMAIL_RE.test(email)) {
-    throw new ValidationError("Ungueltige E-Mail-Adresse.", {
-      email: "Bitte gib eine gueltige E-Mail-Adresse ein.",
+    throw new ValidationError("Ungültige E-Mail-Adresse.", {
+      email: "Bitte gib eine gültige E-Mail-Adresse ein.",
     });
   }
   return email;
@@ -68,7 +68,7 @@ export function requirePassword(value: unknown, field = "password"): string {
   }
   if (value.length > 200) {
     throw new ValidationError("Passwort zu lang.", {
-      [field]: "Das Passwort darf hoechstens 200 Zeichen haben.",
+      [field]: "Das Passwort darf höchstens 200 Zeichen haben.",
     });
   }
   return value;
@@ -79,21 +79,21 @@ export function optionalAmount(value: unknown, field = "amount"): number | null 
   if (value === null || value === undefined || value === "") return null;
   const num = typeof value === "number" ? value : Number.parseFloat(String(value).replace(",", "."));
   if (!Number.isFinite(num)) {
-    throw new ValidationError("Ungueltige Menge.", { [field]: "Menge muss eine Zahl sein." });
+    throw new ValidationError("Ungültige Menge.", { [field]: "Menge muss eine Zahl sein." });
   }
   if (num < 0) {
-    throw new ValidationError("Ungueltige Menge.", { [field]: "Menge darf nicht negativ sein." });
+    throw new ValidationError("Ungültige Menge.", { [field]: "Menge darf nicht negativ sein." });
   }
   if (num > 1_000_000) {
-    throw new ValidationError("Menge zu gross.", { [field]: "Menge ist unrealistisch gross." });
+    throw new ValidationError("Menge zu groß.", { [field]: "Menge ist unrealistisch groß." });
   }
-  // Auf 3 Nachkommastellen runden - mehr braucht keine Kueche.
+  // Auf 3 Nachkommastellen runden - mehr braucht keine Küche.
   return Math.round(num * 1000) / 1000;
 }
 
 /**
  * Bild-URLs: nur http(s) zulassen. Verhindert `javascript:`- und `data:`-URLs,
- * die sonst als XSS-Vektor ueber src-Attribute zurueckkommen koennten.
+ * die sonst als XSS-Vektor über src-Attribute zurückkommen könnten.
  */
 export function optionalImageUrl(value: unknown): string | null {
   const raw = optionalString(value, 2000);
@@ -102,12 +102,12 @@ export function optionalImageUrl(value: unknown): string | null {
   try {
     url = new URL(raw);
   } catch {
-    throw new ValidationError("Ungueltige Bild-URL.", {
-      image: "Bitte gib eine vollstaendige URL an (https://...).",
+    throw new ValidationError("Ungültige Bild-URL.", {
+      image: "Bitte gib eine vollständige URL an (https://...).",
     });
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") {
-    throw new ValidationError("Ungueltige Bild-URL.", {
+    throw new ValidationError("Ungültige Bild-URL.", {
       image: "Nur http- und https-Adressen sind erlaubt.",
     });
   }
@@ -116,5 +116,5 @@ export function optionalImageUrl(value: unknown): string | null {
 
 export function requireBoolean(value: unknown, field: string): boolean {
   if (typeof value === "boolean") return value;
-  throw new ValidationError("Ungueltiger Wert.", { [field]: "Ungueltiger Wert." });
+  throw new ValidationError("Ungültiger Wert.", { [field]: "Ungültiger Wert." });
 }

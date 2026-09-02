@@ -21,7 +21,7 @@ const api = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 api.use("*", csrfProtection);
 api.use("*", loadUser);
 
-/** Kontext fuer den Client: Benutzer, Einstellungen, Zeitzone. */
+/** Kontext für den Client: Benutzer, Einstellungen, Zeitzone. */
 api.get("/me", async (c) => {
   const settings = await getSettings(c.env);
   return c.json({
@@ -34,8 +34,8 @@ api.get("/me", async (c) => {
 
 api.get("/settings", requireAuth, async (c) => {
   const settings = await getSettings(c.env);
-  // Der volle Satz an Einstellungen ist fuer angemeldete Benutzer unkritisch
-  // und wird fuer die Anzeige der Deadline gebraucht.
+  // Der volle Satz an Einstellungen ist für angemeldete Benutzer unkritisch
+  // und wird für die Anzeige der Deadline gebraucht.
   return c.json({ settings, user: currentUser(c) });
 });
 
@@ -49,9 +49,9 @@ api.route("/admin", admin);
 api.notFound((c) => c.json({ error: "Diese Schnittstelle gibt es nicht." }, 404));
 
 /**
- * Zentrale Fehlerbehandlung: Validierungsfehler werden verstaendlich
+ * Zentrale Fehlerbehandlung: Validierungsfehler werden verständlich
  * durchgereicht, alles andere wird geloggt und dem Benutzer nur als neutrale
- * Meldung gezeigt - keine Stacktraces oder SQL-Fehler nach aussen.
+ * Meldung gezeigt - keine Stacktraces oder SQL-Fehler nach außen.
  */
 api.onError((err, c) => {
   if (err instanceof ValidationError) {
@@ -67,9 +67,9 @@ api.onError((err, c) => {
 app.route("/api", api);
 
 /**
- * Alles ausserhalb von /api liefert die gebaute React-App aus. Das
+ * Alles außerhalb von /api liefert die gebaute React-App aus. Das
  * `not_found_handling = "single-page-application"` in wrangler.toml sorgt
- * dafuer, dass Client-Routen wie /essensplan die index.html bekommen.
+ * dafür, dass Client-Routen wie /essensplan die index.html bekommen.
  */
 app.all("*", (c) => c.env.ASSETS.fetch(c.req.raw));
 

@@ -1,4 +1,4 @@
--- Migration 0001: Grundschema fuer Essensplanung, Abstimmung und Einkaufsliste.
+-- Migration 0001: Grundschema für Essensplanung, Abstimmung und Einkaufsliste.
 
 PRAGMA foreign_keys = ON;
 
@@ -16,7 +16,7 @@ CREATE TABLE users (
 );
 
 -- ---------------------------------------------------------------------------
--- Sessions (serverseitig, Cookie enthaelt nur den Hash-Lookup-Token)
+-- Sessions (serverseitig, Cookie enthält nur den Hash-Lookup-Token)
 -- ---------------------------------------------------------------------------
 CREATE TABLE sessions (
   id         TEXT PRIMARY KEY,                  -- SHA-256 des Cookie-Tokens
@@ -28,7 +28,7 @@ CREATE INDEX idx_sessions_user ON sessions(user_id);
 CREATE INDEX idx_sessions_expires ON sessions(expires_at);
 
 -- ---------------------------------------------------------------------------
--- Rate Limiting fuer Login-Versuche
+-- Rate Limiting für Login-Versuche
 -- ---------------------------------------------------------------------------
 CREATE TABLE login_attempts (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -97,11 +97,11 @@ CREATE INDEX idx_votes_meal_day ON votes(meal_day_id);
 --
 -- Automatisch generierte Positionen werden nicht dupliziert gespeichert: sie
 -- entstehen zur Laufzeit aus den Zutaten der geplanten Essen. Diese Tabelle
--- haelt nur den Zustand, der nicht ableitbar ist -> Haken + manuelle Artikel.
+-- hält nur den Zustand, der nicht ableitbar ist -> Haken + manuelle Artikel.
 -- ---------------------------------------------------------------------------
 CREATE TABLE shopping_items (
   id          TEXT PRIMARY KEY,
-  source_key  TEXT UNIQUE,                      -- Schluessel der generierten Zutat, NULL bei manuellen Artikeln
+  source_key  TEXT UNIQUE,                      -- Schlüssel der generierten Zutat, NULL bei manuellen Artikeln
   name        TEXT NOT NULL,
   amount      REAL,
   unit        TEXT,

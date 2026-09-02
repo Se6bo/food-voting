@@ -46,14 +46,14 @@ export function ShoppingPage() {
 
   async function toggle(item: ShoppingItem) {
     const next = !item.checked;
-    // Optimistisch umschalten - fuehlt sich beim Einkaufen deutlich besser an.
+    // Optimistisch umschalten - fühlt sich beim Einkaufen deutlich besser an.
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, checked: next } : i)));
     try {
       await api.put(`/shopping-list/${item.id}`, { checked: next });
     } catch (err) {
       setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, checked: item.checked } : i)));
       toast.error(
-        err instanceof ApiRequestError ? err.message : "Die Aenderung konnte nicht gespeichert werden.",
+        err instanceof ApiRequestError ? err.message : "Die Änderung konnte nicht gespeichert werden.",
       );
     }
   }
@@ -84,9 +84,9 @@ export function ShoppingPage() {
       setNewName("");
       setNewAmount("");
       setNewUnit("");
-      toast.success("Artikel hinzugefuegt.");
+      toast.success("Artikel hinzugefügt.");
     } catch (err) {
-      toast.error(err instanceof ApiRequestError ? err.message : "Der Artikel konnte nicht hinzugefuegt werden.");
+      toast.error(err instanceof ApiRequestError ? err.message : "Der Artikel konnte nicht hinzugefügt werden.");
     } finally {
       setAdding(false);
     }
@@ -141,9 +141,9 @@ export function ShoppingPage() {
               {item.name}
             </span>
             {item.sources.length > 0 && (
-              <span className="mt-0.5 block text-xs muted">Fuer: {item.sources.join(", ")}</span>
+              <span className="mt-0.5 block text-xs muted">Für: {item.sources.join(", ")}</span>
             )}
-            {item.isManual && <span className="mt-0.5 block text-xs muted">Manuell hinzugefuegt</span>}
+            {item.isManual && <span className="mt-0.5 block text-xs muted">Manuell hinzugefügt</span>}
           </span>
         </label>
         <button
@@ -175,7 +175,7 @@ export function ShoppingPage() {
           </Button>
           {done.length > 0 && (
             <Button variant="secondary" onClick={() => setClearOpen(true)}>
-              Erledigte loeschen
+              Erledigte löschen
             </Button>
           )}
         </div>
@@ -201,13 +201,13 @@ export function ShoppingPage() {
         />
         <input
           className="input flex-1"
-          placeholder="Eigenen Artikel hinzufuegen ..."
+          placeholder="Eigenen Artikel hinzufügen ..."
           aria-label="Artikel"
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
         />
         <Button type="submit" loading={adding} disabled={!newName.trim()}>
-          Hinzufuegen
+          Hinzufügen
         </Button>
       </form>
 
@@ -249,8 +249,8 @@ export function ShoppingPage() {
 
       <ConfirmDialog
         open={clearOpen}
-        title="Erledigte loeschen"
-        message={`${done.length} erledigte ${done.length === 1 ? "Artikel wird" : "Artikel werden"} von der Liste entfernt. Ueber "Neu aufbauen" kannst du die Liste jederzeit wieder aus dem Essensplan erzeugen.`}
+        title="Erledigte löschen"
+        message={`${done.length} erledigte ${done.length === 1 ? "Artikel wird" : "Artikel werden"} von der Liste entfernt. Über "Neu aufbauen" kannst du die Liste jederzeit wieder aus dem Essensplan erzeugen.`}
         confirmLabel="Entfernen"
         onConfirm={clearChecked}
         onCancel={() => setClearOpen(false)}

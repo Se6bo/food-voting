@@ -47,10 +47,10 @@ export function MealsPage() {
     try {
       await api.delete(`/meals/${deleting.id}`);
       setMeals((prev) => prev.filter((meal) => meal.id !== deleting.id));
-      toast.success(`"${deleting.name}" wurde geloescht.`);
+      toast.success(`"${deleting.name}" wurde gelöscht.`);
       setDeleting(null);
     } catch (err) {
-      toast.error(err instanceof ApiRequestError ? err.message : "Das Essen konnte nicht geloescht werden.");
+      toast.error(err instanceof ApiRequestError ? err.message : "Das Essen konnte nicht gelöscht werden.");
     } finally {
       setDeleteBusy(false);
     }
@@ -66,7 +66,7 @@ export function MealsPage() {
           <p className="mt-1 text-sm muted">Alle Gerichte mit ihren Zutaten.</p>
         </div>
         <Link to="/essen/neu" className="btn-primary">
-          Essen hinzufuegen
+          Essen hinzufügen
         </Link>
       </header>
 
@@ -86,10 +86,10 @@ export function MealsPage() {
       {meals.length === 0 ? (
         <EmptyState
           title="Noch keine Essen angelegt"
-          description="Lege euer erstes Gericht an - inklusive Zutaten fuer die Einkaufsliste."
+          description="Lege euer erstes Gericht an - inklusive Zutaten für die Einkaufsliste."
           action={
             <Link to="/essen/neu" className="btn-primary">
-              Essen hinzufuegen
+              Essen hinzufügen
             </Link>
           }
         />
@@ -137,7 +137,7 @@ export function MealsPage() {
                       <Link to={`/essen/${meal.id}`} className="btn-secondary flex-1">
                         Bearbeiten
                       </Link>
-                      <Button variant="ghost" onClick={() => setDeleting(meal)} aria-label={`${meal.name} loeschen`}>
+                      <Button variant="ghost" onClick={() => setDeleting(meal)} aria-label={`${meal.name} löschen`}>
                         <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
                           <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />
                         </svg>
@@ -153,8 +153,8 @@ export function MealsPage() {
 
       <ConfirmDialog
         open={deleting !== null}
-        title="Essen loeschen"
-        message={`Soll "${deleting?.name}" wirklich geloescht werden? Damit verschwinden auch die zugehoerigen Planungen und Stimmen.`}
+        title="Essen löschen"
+        message={`Soll "${deleting?.name}" wirklich gelöscht werden? Damit verschwinden auch die zugehörigen Planungen und Stimmen.`}
         onConfirm={confirmDelete}
         onCancel={() => setDeleting(null)}
         busy={deleteBusy}

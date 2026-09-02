@@ -54,9 +54,9 @@ export function DashboardPage() {
         </h1>
         <p className="mt-1 text-sm muted">
           {openVotes > 0
-            ? `Du kannst noch fuer ${openVotes} ${openVotes === 1 ? "Tag" : "Tage"} abstimmen.`
+            ? `Du kannst noch für ${openVotes} ${openVotes === 1 ? "Tag" : "Tage"} abstimmen.`
             : upcoming.length > 0
-              ? "Du hast fuer alle offenen Tage abgestimmt. Guten Appetit!"
+              ? "Du hast für alle offenen Tage abgestimmt. Guten Appetit!"
               : "Noch nichts geplant - leg gleich los."}
         </p>
       </header>
@@ -69,7 +69,7 @@ export function DashboardPage() {
           description="Lege ein Essen an und ordne es einem Tag zu - danach kann die Gruppe abstimmen."
           action={
             <Link to="/essen/neu" className="btn-primary">
-              Essen hinzufuegen
+              Essen hinzufügen
             </Link>
           }
         />
@@ -98,13 +98,13 @@ export function DashboardPage() {
           <section className="grid gap-4 sm:grid-cols-3">
             <Link to="/essen/neu" className="card group p-5 transition-shadow hover:shadow-card-hover">
               <span className="text-2xl" aria-hidden="true">➕</span>
-              <h3 className="mt-2 font-semibold">Essen hinzufuegen</h3>
+              <h3 className="mt-2 font-semibold">Essen hinzufügen</h3>
               <p className="mt-1 text-sm muted">Neues Gericht mit Zutaten anlegen.</p>
             </Link>
             <Link to="/essensplan" className="card group p-5 transition-shadow hover:shadow-card-hover">
               <span className="text-2xl" aria-hidden="true">📅</span>
               <h3 className="mt-2 font-semibold">Essensplan</h3>
-              <p className="mt-1 text-sm muted">Alle geplanten Tage im Ueberblick.</p>
+              <p className="mt-1 text-sm muted">Alle geplanten Tage im Überblick.</p>
             </Link>
             <Link to="/einkaufsliste" className="card group p-5 transition-shadow hover:shadow-card-hover">
               <span className="text-2xl" aria-hidden="true">🛒</span>

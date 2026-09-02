@@ -22,7 +22,7 @@ import {
 
 // Pro Konto streng (verhindert gezieltes Durchprobieren eines Passworts),
 // pro IP deutlich lockerer: hinter einem gemeinsamen Anschluss (WG, NAT)
-// wuerde ein strenger IP-Zaehler sonst alle Mitbewohner aussperren.
+// würde ein strenger IP-Zähler sonst alle Mitbewohner aussperren.
 const LOGIN_LIMIT_PER_ACCOUNT = 8;
 const LOGIN_LIMIT_PER_IP = 40;
 const LOGIN_WINDOW_SECONDS = 15 * 60;
@@ -39,8 +39,8 @@ auth.post("/register", async (c) => {
   const passwordConfirm = body.passwordConfirm;
 
   if (password !== passwordConfirm) {
-    throw new ValidationError("Die Passwoerter stimmen nicht ueberein.", {
-      passwordConfirm: "Die Passwoerter stimmen nicht ueberein.",
+    throw new ValidationError("Die Passwörter stimmen nicht überein.", {
+      passwordConfirm: "Die Passwörter stimmen nicht überein.",
     });
   }
 
@@ -48,7 +48,7 @@ auth.post("/register", async (c) => {
   const adminEmail = c.env.ADMIN_EMAIL?.trim().toLowerCase();
   const isConfiguredAdmin = Boolean(adminEmail) && emailLower === adminEmail;
 
-  // Der erste Admin wird ueber die Umgebungsvariable ADMIN_EMAIL bestimmt und
+  // Der erste Admin wird über die Umgebungsvariable ADMIN_EMAIL bestimmt und
   // darf sich immer registrieren - auch wenn die Registrierung geschlossen ist.
   if (!settings.registrationOpen && !isConfiguredAdmin) {
     return c.json({ error: "Die Registrierung ist derzeit deaktiviert." }, 403);
@@ -56,7 +56,7 @@ auth.post("/register", async (c) => {
 
   const inviteCode = c.env.SIGNUP_INVITE_CODE?.trim();
   if (inviteCode && !isConfiguredAdmin && body.inviteCode !== inviteCode) {
-    throw new ValidationError("Ungueltiger Einladungscode.", {
+    throw new ValidationError("Ungültiger Einladungscode.", {
       inviteCode: "Der Einladungscode stimmt nicht.",
     });
   }
@@ -71,7 +71,7 @@ auth.post("/register", async (c) => {
   }
 
   // Der allererste Benutzer wird Admin, damit die Anwendung nie ohne
-  // Administrator dasteht. Danach entscheidet ausschliesslich ADMIN_EMAIL.
+  // Administrator dasteht. Danach entscheidet ausschließlich ADMIN_EMAIL.
   const userCount = await c.env.DB.prepare("SELECT COUNT(*) AS count FROM users").first<{
     count: number;
   }>();
@@ -122,12 +122,12 @@ auth.post("/login", async (c) => {
   if (!row || !valid) {
     await recordRateLimitAttempt(c.env, ipKey);
     await recordRateLimitAttempt(c.env, emailKey);
-    // Bewusst dieselbe Meldung fuer "Konto unbekannt" und "Passwort falsch",
-    // damit keine gueltigen E-Mail-Adressen ausgelesen werden koennen.
+    // Bewusst dieselbe Meldung für "Konto unbekannt" und "Passwort falsch",
+    // damit keine gültigen E-Mail-Adressen ausgelesen werden können.
     return c.json({ error: "E-Mail-Adresse oder Passwort ist falsch." }, 401);
   }
 
-  // Erfolgreicher Login raeumt beide Zaehler ab.
+  // Erfolgreicher Login räumt beide Zähler ab.
   await clearRateLimit(c.env, emailKey);
   await clearRateLimit(c.env, ipKey);
   await createSession(c, row.id);
@@ -155,7 +155,7 @@ auth.post("/logout", async (c) => {
   return c.json({ ok: true });
 });
 
-/** Eigenes Profil aendern (Name / Passwort). */
+/** Eigenes Profil ändern (Name / Passwort). */
 auth.put("/profile", requireAuth, async (c) => {
   const user = currentUser(c);
   const body = await c.req.json().catch(() => ({}));

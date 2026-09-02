@@ -3,22 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="description" content="Gemeinsame Essensplanung, Abstimmung und Einkaufsliste fuer WGs und Familien." />
+    <meta name="description" content="Gemeinsame Essensplanung, Abstimmung und Einkaufsliste für WGs und Familien." />
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0b0f14" media="(prefers-color-scheme: dark)" />
     <title>Essensplan</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍲</text></svg>" />
-    <script>
-      // Theme vor dem ersten Paint setzen -> kein Flash of Wrong Theme.
-      (function () {
-        try {
-          var stored = localStorage.getItem("theme");
-          var dark = stored ? stored === "dark"
-            : window.matchMedia("(prefers-color-scheme: dark)").matches;
-          if (dark) document.documentElement.classList.add("dark");
-        } catch (e) {}
-      })();
-    </script>
+    <!-- Render-blockierend: setzt die Theme-Klasse vor dem ersten Paint. -->
+    <script src="/theme-init.js"></script>
   </head>
   <body class="h-full">
     <div id="root" class="h-full"></div>

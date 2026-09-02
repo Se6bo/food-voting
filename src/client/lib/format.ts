@@ -1,5 +1,5 @@
 /**
- * Anzeige-Helfer. Datumsformatierung laeuft bewusst ueber die App-Zeitzone,
+ * Anzeige-Helfer. Datumsformatierung läuft bewusst über die App-Zeitzone,
  * damit ein Benutzer im Urlaub dieselbe Deadline sieht wie zuhause.
  */
 
@@ -66,7 +66,7 @@ export function formatTimestampShort(isoTimestamp: string): string {
   return Number.isNaN(date.getTime()) ? isoTimestamp : dateOnly.format(date);
 }
 
-/** "Heute", "Morgen" oder der Wochentag - liest sich natuerlicher als ein Datum. */
+/** "Heute", "Morgen" oder der Wochentag - liest sich natürlicher als ein Datum. */
 export function relativeDayLabel(isoDate: string, today: string): string | null {
   if (isoDate === today) return "Heute";
   const todayDate = isoToDate(today);
@@ -76,14 +76,14 @@ export function relativeDayLabel(isoDate: string, today: string): string | null 
   return null;
 }
 
-/** Mengen huebsch ausgeben: 1.5 -> "1,5", 2 -> "2". */
+/** Mengen hübsch ausgeben: 1.5 -> "1,5", 2 -> "2". */
 export function formatAmount(amount: number | null, unit: string | null): string {
   if (amount === null) return unit ?? "";
   const formatted = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 3 }).format(amount);
   return unit ? `${formatted} ${unit}` : formatted;
 }
 
-/** Ein passendes Emoji zum Essensnamen - kleine Freude, keine Logik daran haengen. */
+/** Ein passendes Emoji zum Essensnamen - kleine Freude, keine Logik daran hängen. */
 const EMOJI_RULES: Array<[RegExp, string]> = [
   [/pizza/i, "🍕"],
   [/pasta|spaghetti|nudel|bolognese|carbonara|lasagne/i, "🍝"],

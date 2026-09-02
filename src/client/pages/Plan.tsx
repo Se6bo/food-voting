@@ -14,7 +14,7 @@ interface PlanningResponse {
   range: { from: string; to: string };
 }
 
-/** Datum + Essen zuordnen. Steht allen offen; bestehende Tage aendert nur ein Admin. */
+/** Datum + Essen zuordnen. Steht allen offen; bestehende Tage ändert nur ein Admin. */
 function AssignDialog({
   open,
   onClose,
@@ -50,7 +50,7 @@ function AssignDialog({
 
   async function handleSave() {
     if (!mealId) {
-      setError("Bitte waehle ein Essen aus.");
+      setError("Bitte wähle ein Essen aus.");
       return;
     }
     setSaving(true);
@@ -101,7 +101,7 @@ function AssignDialog({
           />
           {plannedDates.has(date) && (
             <p className="mt-1.5 text-sm text-amber-600 dark:text-amber-400">
-              Fuer diesen Tag ist bereits ein Essen geplant. Nur Admins koennen das aendern.
+              Für diesen Tag ist bereits ein Essen geplant. Nur Admins können das ändern.
             </p>
           )}
         </div>
@@ -193,7 +193,7 @@ export function PlanPage() {
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Essensplan</h1>
-          <p className="mt-1 text-sm muted">Was in den naechsten Tagen auf den Tisch kommt.</p>
+          <p className="mt-1 text-sm muted">Was in den nächsten Tagen auf den Tisch kommt.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={() => setShowPast((v) => !v)}>

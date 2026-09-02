@@ -1,10 +1,10 @@
 /**
- * Passwort-Hashing mit PBKDF2-SHA256 ueber die WebCrypto-API.
+ * Passwort-Hashing mit PBKDF2-SHA256 über die WebCrypto-API.
  *
  * Warum PBKDF2 und nicht bcrypt/argon2? Cloudflare Workers bieten WebCrypto
- * nativ an; bcrypt/argon2 wuerden ein WASM-Modul und damit deutlich mehr
- * Bundle-Groesse und Cold-Start-Zeit bedeuten. PBKDF2 mit 210.000 Iterationen
- * entspricht der aktuellen OWASP-Empfehlung fuer PBKDF2-HMAC-SHA256.
+ * nativ an; bcrypt/argon2 würden ein WASM-Modul und damit deutlich mehr
+ * Bundle-Größe und Cold-Start-Zeit bedeuten. PBKDF2 mit 210.000 Iterationen
+ * entspricht der aktuellen OWASP-Empfehlung für PBKDF2-HMAC-SHA256.
  *
  * Format: pbkdf2$<iterations>$<salt-b64>$<hash-b64>
  */

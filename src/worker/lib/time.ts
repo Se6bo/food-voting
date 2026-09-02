@@ -1,10 +1,10 @@
 /**
  * Zeit- und Deadline-Logik.
  *
- * Die Abstimmungs-Deadline haengt an einer Kalender-Zeitzone, nicht an UTC:
- * "Fuer Freitag darf bis Donnerstag 23:59 Uhr abgestimmt werden" meint lokale
+ * Die Abstimmungs-Deadline hängt an einer Kalender-Zeitzone, nicht an UTC:
+ * "Für Freitag darf bis Donnerstag 23:59 Uhr abgestimmt werden" meint lokale
  * Zeit. Wir rechnen daher bewusst mit einer festen App-Zeitzone statt mit der
- * Zeitzone des Browsers - sonst haetten unterschiedliche Benutzer
+ * Zeitzone des Browsers - sonst hätten unterschiedliche Benutzer
  * unterschiedliche Deadlines.
  */
 
@@ -39,14 +39,14 @@ function partsInZone(date: Date): DateParts {
     year: Number(parts.year),
     month: Number(parts.month),
     day: Number(parts.day),
-    // Intl liefert im 24h-Format gelegentlich "24" fuer Mitternacht.
+    // Intl liefert im 24h-Format gelegentlich "24" für Mitternacht.
     hour: Number(parts.hour) % 24,
     minute: Number(parts.minute),
     second: Number(parts.second),
   };
 }
 
-/** Offset der App-Zeitzone gegenueber UTC in Millisekunden zum Zeitpunkt `date`. */
+/** Offset der App-Zeitzone gegenüber UTC in Millisekunden zum Zeitpunkt `date`. */
 function zoneOffsetMs(date: Date): number {
   const p = partsInZone(date);
   const asUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
@@ -55,7 +55,7 @@ function zoneOffsetMs(date: Date): number {
 
 /**
  * Wandelt eine lokale Wanduhrzeit in den passenden UTC-Zeitpunkt um.
- * Zwei Durchlaeufe, damit Sommer-/Winterzeitwechsel korrekt getroffen werden.
+ * Zwei Durchläufe, damit Sommer-/Winterzeitwechsel korrekt getroffen werden.
  */
 export function zonedTimeToUtc(
   year: number,
@@ -83,7 +83,7 @@ export function toIsoDate(year: number, month: number, day: number): string {
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-/** Prueft ein ISO-Datum inklusive echter Kalendergueltigkeit (kein 2025-02-30). */
+/** Prüft ein ISO-Datum inklusive echter Kalendergültigkeit (kein 2025-02-30). */
 export function isValidIsoDate(value: string): boolean {
   if (!ISO_DATE_RE.test(value)) return false;
   const [y, m, d] = value.split("-").map(Number);
@@ -100,7 +100,7 @@ export function addDays(isoDate: string, days: number): string {
 }
 
 /**
- * Abstimmungs-Deadline fuer einen geplanten Tag: der Vorabend um HH:59:59
+ * Abstimmungs-Deadline für einen geplanten Tag: der Vorabend um HH:59:59
  * lokaler Zeit (Standard 23:59:59).
  */
 export function votingDeadline(isoDate: string, deadlineHour = 23): Date {
@@ -110,7 +110,7 @@ export function votingDeadline(isoDate: string, deadlineHour = 23): Date {
 }
 
 /**
- * Ist die Abstimmung fuer diesen Tag noch offen? Einzige Wahrheit - der Client
+ * Ist die Abstimmung für diesen Tag noch offen? Einzige Wahrheit - der Client
  * bekommt nur das Ergebnis, nie die Entscheidung.
  */
 export function votingState(

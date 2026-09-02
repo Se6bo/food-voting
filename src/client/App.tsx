@@ -13,7 +13,7 @@ import { ProfilePage } from "./pages/Profile";
 import { RegisterPage } from "./pages/Register";
 import { ShoppingPage } from "./pages/Shopping";
 
-/** Nicht angemeldet -> Login. Der Server prueft zusaetzlich jeden Endpunkt. */
+/** Nicht angemeldet -> Login. Der Server prüft zusätzlich jeden Endpunkt. */
 function RequireAuth({ children }: { children: ReactElement }) {
   const { user, loading } = useAuth();
   if (loading) return <PageLoader />;

@@ -1,7 +1,7 @@
 import type { ApiError } from "../../shared/types";
 
 /**
- * Fehler mit den Feldfehlern des Servers - Formulare koennen sie direkt
+ * Fehler mit den Feldfehlern des Servers - Formulare können sie direkt
  * an den passenden Eingabefeldern anzeigen.
  */
 export class ApiRequestError extends Error {
@@ -30,7 +30,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     });
   } catch {
     throw new ApiRequestError(
-      "Keine Verbindung zum Server. Bitte pruefe deine Internetverbindung.",
+      "Keine Verbindung zum Server. Bitte prüfe deine Internetverbindung.",
       0,
     );
   }

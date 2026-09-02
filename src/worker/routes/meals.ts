@@ -36,13 +36,13 @@ interface IngredientRow {
 export function parseIngredients(value: unknown): IngredientInput[] {
   if (value === undefined || value === null) return [];
   if (!Array.isArray(value)) {
-    throw new ValidationError("Zutaten haben ein ungueltiges Format.", {
+    throw new ValidationError("Zutaten haben ein ungültiges Format.", {
       ingredients: "Zutaten konnten nicht gelesen werden.",
     });
   }
   if (value.length > MAX_INGREDIENTS) {
     throw new ValidationError("Zu viele Zutaten.", {
-      ingredients: `Bitte hoechstens ${MAX_INGREDIENTS} Zutaten angeben.`,
+      ingredients: `Bitte höchstens ${MAX_INGREDIENTS} Zutaten angeben.`,
     });
   }
   const result: IngredientInput[] = [];
@@ -60,7 +60,7 @@ export function parseIngredients(value: unknown): IngredientInput[] {
   return result;
 }
 
-/** Laedt Essen inklusive Zutaten in zwei Abfragen statt N+1. */
+/** Lädt Essen inklusive Zutaten in zwei Abfragen statt N+1. */
 export async function loadMeals(
   env: Env,
   viewer: { id: string; role: string },
@@ -207,10 +207,10 @@ meals.delete("/:id", async (c) => {
     .first<{ created_by: string | null }>();
   if (!existing) return c.json({ error: "Dieses Essen gibt es nicht (mehr)." }, 404);
   if (user.role !== "admin" && existing.created_by !== user.id) {
-    return c.json({ error: "Du kannst nur deine eigenen Essen loeschen." }, 403);
+    return c.json({ error: "Du kannst nur deine eigenen Essen löschen." }, 403);
   }
 
-  // ON DELETE CASCADE raeumt Zutaten, Planungen und Stimmen mit auf.
+  // ON DELETE CASCADE räumt Zutaten, Planungen und Stimmen mit auf.
   await c.env.DB.prepare("DELETE FROM meals WHERE id = ?").bind(id).run();
   return c.json({ ok: true });
 });

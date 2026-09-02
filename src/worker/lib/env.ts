@@ -4,7 +4,7 @@ export interface Env {
   ENVIRONMENT: string;
   /** E-Mail, die bei der Registrierung automatisch Admin wird. */
   ADMIN_EMAIL?: string;
-  /** Optionaler Einladungscode fuer die Registrierung. */
+  /** Optionaler Einladungscode für die Registrierung. */
   SIGNUP_INVITE_CODE?: string;
 }
 

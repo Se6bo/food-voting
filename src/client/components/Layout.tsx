@@ -57,7 +57,7 @@ export function Layout() {
   const toast = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Beim Seitenwechsel das mobile Menue schliessen.
+  // Beim Seitenwechsel das mobile Menü schließen.
   useEffect(() => {
     setMenuOpen(false);
   }, [location.pathname]);
@@ -80,14 +80,14 @@ export function Layout() {
 
   return (
     <div className="min-h-full">
-      {/* Kopfzeile - auf allen Groessen sichtbar */}
+      {/* Kopfzeile - auf allen Größen sichtbar */}
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/80 backdrop-blur-md dark:border-slate-800 dark:bg-[#0b0f14]/80">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => setMenuOpen((open) => !open)}
-              aria-label="Menue oeffnen"
+              aria-label="Menü öffnen"
               aria-expanded={menuOpen}
               className="rounded-xl p-2.5 text-slate-600 transition-colors hover:bg-slate-100 lg:hidden dark:text-slate-300 dark:hover:bg-slate-800"
             >
@@ -141,7 +141,7 @@ export function Layout() {
         </main>
       </div>
 
-      {/* Mobiles Ausklappmenue */}
+      {/* Mobiles Ausklappmenü */}
       {menuOpen && (
         <div className="fixed inset-0 z-20 lg:hidden">
           <div className="absolute inset-0 bg-slate-900/40" onClick={() => setMenuOpen(false)} aria-hidden="true" />
@@ -159,7 +159,7 @@ export function Layout() {
         </div>
       )}
 
-      {/* Tab-Leiste auf Mobile - grosse Touch-Targets, immer erreichbar */}
+      {/* Tab-Leiste auf Mobile - große Touch-Targets, immer erreichbar */}
       <nav
         aria-label="Schnellnavigation"
         className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 backdrop-blur-md lg:hidden dark:border-slate-800 dark:bg-[#0b0f14]/95"

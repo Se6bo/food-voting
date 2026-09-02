@@ -27,7 +27,7 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       await login(email, password);
-      toast.success("Willkommen zurueck!");
+      toast.success("Willkommen zurück!");
       navigate("/", { replace: true });
     } catch (err) {
       setError(

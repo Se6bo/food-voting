@@ -7,7 +7,7 @@ import { useToast } from "../lib/toast";
 import { Alert, Button, PageLoader } from "../components/ui";
 
 interface IngredientRow extends IngredientInput {
-  /** Stabiler Key fuer React, unabhaengig von der Position in der Liste. */
+  /** Stabiler Key für React, unabhängig von der Position in der Liste. */
   key: string;
 }
 
@@ -97,7 +97,7 @@ export function MealFormPage() {
       if (!isEdit && planDate) {
         try {
           await api.post("/planning", { date: planDate, mealId: result.meal.id });
-          toast.success("Essen erfolgreich hinzugefuegt und eingeplant.");
+          toast.success("Essen erfolgreich hinzugefügt und eingeplant.");
         } catch (err) {
           toast.info(
             err instanceof ApiRequestError
@@ -106,7 +106,7 @@ export function MealFormPage() {
           );
         }
       } else {
-        toast.success(isEdit ? "Aenderungen gespeichert." : "Essen erfolgreich hinzugefuegt.");
+        toast.success(isEdit ? "Änderungen gespeichert." : "Essen erfolgreich hinzugefügt.");
       }
 
       navigate("/essen");
@@ -128,7 +128,7 @@ export function MealFormPage() {
     <div className="mx-auto max-w-2xl space-y-6">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">
-          {isEdit ? "Essen bearbeiten" : "Essen hinzufuegen"}
+          {isEdit ? "Essen bearbeiten" : "Essen hinzufügen"}
         </h1>
         <p className="mt-1 text-sm muted">
           Die Zutaten landen automatisch in der Einkaufsliste, sobald das Essen eingeplant ist.
@@ -200,7 +200,7 @@ export function MealFormPage() {
                   <input
                     className="input px-2.5"
                     inputMode="decimal"
-                    aria-label={`Menge fuer Zutat ${index + 1}`}
+                    aria-label={`Menge für Zutat ${index + 1}`}
                     placeholder="500"
                     value={row.amount === null ? "" : String(row.amount)}
                     onChange={(e) => {
@@ -216,7 +216,7 @@ export function MealFormPage() {
                   <input
                     className="input px-2.5"
                     list="units"
-                    aria-label={`Einheit fuer Zutat ${index + 1}`}
+                    aria-label={`Einheit für Zutat ${index + 1}`}
                     placeholder="g"
                     value={row.unit ?? ""}
                     onChange={(e) => updateRow(row.key, { unit: e.target.value })}
@@ -255,7 +255,7 @@ export function MealFormPage() {
             className="mt-4"
             onClick={() => setRows((prev) => [...prev, emptyRow()])}
           >
-            + Zutat hinzufuegen
+            + Zutat hinzufügen
           </Button>
         </section>
 
@@ -272,7 +272,7 @@ export function MealFormPage() {
               onChange={(e) => setPlanDate(e.target.value)}
             />
             <p className="mt-1.5 text-sm muted">
-              Waehle einen Tag, dann kann die Gruppe sofort abstimmen.
+              Wähle einen Tag, dann kann die Gruppe sofort abstimmen.
             </p>
           </section>
         )}
@@ -282,7 +282,7 @@ export function MealFormPage() {
             Abbrechen
           </Button>
           <Button type="submit" loading={saving}>
-            {isEdit ? "Aenderungen speichern" : "Essen hinzufuegen"}
+            {isEdit ? "Änderungen speichern" : "Essen hinzufügen"}
           </Button>
         </div>
       </form>

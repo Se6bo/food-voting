@@ -1,23 +1,27 @@
 /**
- * Einheiten-Normalisierung fuer die Einkaufsliste.
+ * Einheiten-Normalisierung für die Einkaufsliste.
  *
  * Ziel: "500 g Tomaten" + "500 g Tomaten" -> "1 kg Tomaten", ohne dabei
  * Unsinn zu erzeugen. Deshalb werden nur Zutaten mit derselben *Dimension*
- * (Masse, Volumen, Stueck ...) zusammengefasst. "2 Stk Tomaten" und
- * "500 g Tomaten" bleiben zwei getrennte Eintraege.
+ * (Masse, Volumen, Stück ...) zusammengefasst. "2 Stk Tomaten" und
+ * "500 g Tomaten" bleiben zwei getrennte Einträge.
  */
 
 export type Dimension = "mass" | "volume" | "count" | "spoon" | "other";
 
 interface UnitDefinition {
-  /** Kanonische Schreibweise fuer die Anzeige. */
+  /** Kanonische Schreibweise für die Anzeige. */
   canonical: string;
   dimension: Dimension;
   /** Faktor zur Basiseinheit der Dimension (g bzw. ml). */
   factor: number;
 }
 
-/** Alle Schreibweisen, die wir erkennen, jeweils klein geschrieben. */
+/**
+ * Alle Schreibweisen, die wir erkennen, jeweils klein geschrieben. Bewusst
+ * sowohl mit Umlaut als auch in ASCII-Schreibweise, damit "Stück" und "Stueck"
+ * gleich behandelt werden - Benutzer tippen mal so, mal so.
+ */
 const UNIT_ALIASES: Record<string, UnitDefinition> = {
   // Masse - Basis: Gramm
   mg: { canonical: "mg", dimension: "mass", factor: 0.001 },
@@ -35,18 +39,20 @@ const UNIT_ALIASES: Record<string, UnitDefinition> = {
   l: { canonical: "l", dimension: "volume", factor: 1000 },
   liter: { canonical: "l", dimension: "volume", factor: 1000 },
 
-  // Stueckzahlen
+  // Stückzahlen
   stk: { canonical: "Stk", dimension: "count", factor: 1 },
   stueck: { canonical: "Stk", dimension: "count", factor: 1 },
   "stück": { canonical: "Stk", dimension: "count", factor: 1 },
   st: { canonical: "Stk", dimension: "count", factor: 1 },
   x: { canonical: "Stk", dimension: "count", factor: 1 },
 
-  // Loeffelmasse - untereinander umrechenbar (1 EL = 3 TL)
+  // Löffelmaße - untereinander umrechenbar (1 EL = 3 TL)
   tl: { canonical: "TL", dimension: "spoon", factor: 1 },
   teeloeffel: { canonical: "TL", dimension: "spoon", factor: 1 },
+  "teelöffel": { canonical: "TL", dimension: "spoon", factor: 1 },
   el: { canonical: "EL", dimension: "spoon", factor: 3 },
   essloeffel: { canonical: "EL", dimension: "spoon", factor: 3 },
+  "esslöffel": { canonical: "EL", dimension: "spoon", factor: 3 },
 };
 
 /** Einheiten ohne sinnvolle Umrechnung: exakt gleiche Einheit wird summiert. */
@@ -80,11 +86,11 @@ export function normalizeUnit(unit: string | null | undefined): NormalizedUnit {
   const other = KNOWN_OTHER_UNITS.find((u) => u.toLowerCase() === key);
   if (other) return { canonical: other, dimension: "other", factor: 1 };
 
-  // Unbekannte Einheit: unveraendert uebernehmen, nur exakte Treffer summieren.
+  // Unbekannte Einheit: unverändert übernehmen, nur exakte Treffer summieren.
   return { canonical: unit.trim(), dimension: "other", factor: 1 };
 }
 
-/** Zutatennamen fuer den Vergleich vereinheitlichen (Gross-/Kleinschreibung, Plural-Whitespace). */
+/** Zutatennamen für den Vergleich vereinheitlichen (Groß-/Kleinschreibung, Plural-Whitespace). */
 export function normalizeName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, " ");
 }
@@ -136,7 +142,7 @@ export interface AggregatedIngredient {
  * Fasst Zutaten mehrerer Essen zu einer Einkaufsliste zusammen.
  *
  * Zutaten ohne Mengenangabe (z.B. "Salz") werden zu einem Eintrag ohne Menge
- * zusammengefasst - Aufaddieren waere hier sinnlos.
+ * zusammengefasst - Aufaddieren wäre hier sinnlos.
  */
 export function aggregateIngredients(items: AggregatableIngredient[]): AggregatedIngredient[] {
   interface Bucket {
@@ -160,7 +166,7 @@ export function aggregateIngredients(items: AggregatableIngredient[]): Aggregate
     const hasAmount = item.amount !== null && Number.isFinite(item.amount);
 
     // Zutaten ohne Menge bekommen einen eigenen Bucket, damit "Salz" nicht
-    // faelschlich mit "200 g Salz" verrechnet wird.
+    // fälschlich mit "200 g Salz" verrechnet wird.
     const unitKey = dimension === "other" ? `other:${(canonical ?? "").toLowerCase()}` : dimension;
     const key = hasAmount
       ? `${normalizeName(name)}|${unitKey}`

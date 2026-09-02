@@ -89,7 +89,7 @@ export function EmptyState({
   );
 }
 
-/** Zugaenglicher Modal-Dialog fuer Bestaetigungen und kleine Formulare. */
+/** Zugänglicher Modal-Dialog für Bestätigungen und kleine Formulare. */
 export function Modal({
   open,
   title,
@@ -122,7 +122,7 @@ export function Modal({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Schliessen"
+            aria-label="Schließen"
             className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
           >
             <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -145,7 +145,7 @@ export function ConfirmDialog({
   open,
   title,
   message,
-  confirmLabel = "Loeschen",
+  confirmLabel = "Löschen",
   onConfirm,
   onCancel,
   busy = false,
@@ -179,7 +179,7 @@ export function ConfirmDialog({
   );
 }
 
-/** Fortschrittsbalken fuer die prozentuale Zustimmung. */
+/** Fortschrittsbalken für die prozentuale Zustimmung. */
 export function ApprovalBar({ approval, total }: { approval: number; total: number }) {
   return (
     <div className="space-y-1.5">

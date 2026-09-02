@@ -46,7 +46,7 @@ export async function createSession(c: AppContext, userId: string): Promise<void
 
   setCookie(c, SESSION_COOKIE, token, {
     httpOnly: true,
-    // In Produktion zwingend ueber HTTPS; lokal wuerde Secure das Cookie
+    // In Produktion zwingend über HTTPS; lokal würde Secure das Cookie
     // auf http://localhost blockieren.
     secure: isProduction(c.env),
     sameSite: "Lax",
@@ -64,14 +64,14 @@ export async function destroySession(c: AppContext): Promise<void> {
   deleteCookie(c, SESSION_COOKIE, { path: "/", secure: isProduction(c.env) });
 }
 
-/** Alle Sessions eines Benutzers beenden (z.B. bei Rollenwechsel oder Loeschung). */
+/** Alle Sessions eines Benutzers beenden (z.B. bei Rollenwechsel oder Löschung). */
 export async function destroyAllSessionsFor(env: Env, userId: string): Promise<void> {
   await env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(userId).run();
 }
 
 /**
- * Laedt den Benutzer aus dem Session-Cookie. Setzt `user` immer (ggf. null),
- * blockt aber nicht - das uebernehmen `requireAuth` / `requireAdmin`.
+ * Lädt den Benutzer aus dem Session-Cookie. Setzt `user` immer (ggf. null),
+ * blockt aber nicht - das übernehmen `requireAuth` / `requireAdmin`.
  */
 export const loadUser: MiddlewareHandler<{ Bindings: Env; Variables: AppVariables }> = async (
   c,
@@ -110,7 +110,7 @@ export const requireAuth: MiddlewareHandler<{ Bindings: Env; Variables: AppVaria
 };
 
 /**
- * Admin-Pruefung ausschliesslich serverseitig anhand der Rolle aus der
+ * Admin-Prüfung ausschließlich serverseitig anhand der Rolle aus der
  * Datenbank. Der Client kann seine Rolle nie selbst behaupten.
  */
 export const requireAdmin: MiddlewareHandler<{ Bindings: Env; Variables: AppVariables }> = async (
@@ -120,12 +120,12 @@ export const requireAdmin: MiddlewareHandler<{ Bindings: Env; Variables: AppVari
   const user = c.get("user");
   if (!user) return c.json({ error: "Bitte melde dich an." }, 401);
   if (user.role !== "admin") {
-    return c.json({ error: "Dafuer fehlen dir die Berechtigungen." }, 403);
+    return c.json({ error: "Dafür fehlen dir die Berechtigungen." }, 403);
   }
   await next();
 };
 
-/** Hilfsfunktion fuer Routen: garantiert nicht-null Benutzer hinter requireAuth. */
+/** Hilfsfunktion für Routen: garantiert nicht-null Benutzer hinter requireAuth. */
 export function currentUser(c: AppContext): PublicUser {
   const user = c.get("user");
   if (!user) throw new Error("currentUser() ohne requireAuth aufgerufen");
@@ -153,7 +153,7 @@ export async function createUser(
   return toPublicUser(row);
 }
 
-/** Aufraeumen abgelaufener Sessions - guenstig genug fuer den MVP. */
+/** Aufräumen abgelaufener Sessions - günstig genug für den MVP. */
 export async function purgeExpiredSessions(env: Env): Promise<void> {
   await env.DB.prepare("DELETE FROM sessions WHERE expires_at <= datetime('now')").run();
 }

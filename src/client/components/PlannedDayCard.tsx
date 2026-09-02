@@ -5,7 +5,7 @@ import { formatAmount, formatDateTime, formatDay, mealEmoji, relativeDayLabel } 
 import { useToast } from "../lib/toast";
 import { ApprovalBar, Spinner } from "./ui";
 
-/** Verstaendlicher Text dazu, warum eine Abstimmung geschlossen ist. */
+/** Verständlicher Text dazu, warum eine Abstimmung geschlossen ist. */
 function closedMessage(day: PlannedDay): string {
   switch (day.closedReason) {
     case "past":
@@ -36,11 +36,11 @@ export function PlannedDayCard({
     if (pending) return;
     setPending(value);
     try {
-      // Gleiche Stimme nochmal = Stimme zuruecknehmen.
+      // Gleiche Stimme nochmal = Stimme zurücknehmen.
       if (day.myVote === value) {
         const result = await api.delete<{ day: PlannedDay }>(`/votes/${day.id}`);
         onChange(result.day);
-        toast.info("Deine Stimme wurde zurueckgenommen.");
+        toast.info("Deine Stimme wurde zurückgenommen.");
       } else {
         const result = await api.post<{ day: PlannedDay }>("/votes", {
           mealDayId: day.id,
@@ -76,7 +76,7 @@ export function PlannedDayCard({
           loading="lazy"
           className="h-40 w-full object-cover sm:h-48"
           onError={(e) => {
-            // Kaputte Bild-URLs sollen das Layout nicht zerschiessen.
+            // Kaputte Bild-URLs sollen das Layout nicht zerschießen.
             e.currentTarget.style.display = "none";
           }}
         />
@@ -155,14 +155,14 @@ export function PlannedDayCard({
               disabled={pending !== null}
               aria-pressed={day.myVote === 1}
               className={[
-                "btn min-h-[44px] flex-1 border",
+                "btn min-h-[44px] flex-1 whitespace-nowrap border px-3",
                 day.myVote === 1
                   ? "border-brand-600 bg-brand-600 text-white hover:bg-brand-700 dark:border-brand-500 dark:bg-brand-500 dark:text-slate-950"
                   : "border-slate-300 bg-white text-slate-700 hover:border-brand-400 hover:bg-brand-50 dark:border-slate-700 dark:bg-[#1a222c] dark:text-slate-200 dark:hover:bg-slate-800",
               ].join(" ")}
             >
               {pending === 1 ? <Spinner className="h-4 w-4" /> : <span aria-hidden="true">👍</span>}
-              Gefaellt mir
+              Gefällt mir
             </button>
             <button
               type="button"
@@ -170,7 +170,7 @@ export function PlannedDayCard({
               disabled={pending !== null}
               aria-pressed={day.myVote === -1}
               className={[
-                "btn min-h-[44px] flex-1 border",
+                "btn min-h-[44px] flex-1 whitespace-nowrap border px-3",
                 day.myVote === -1
                   ? "border-slate-700 bg-slate-700 text-white hover:bg-slate-800 dark:border-slate-500 dark:bg-slate-600"
                   : "border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50 dark:border-slate-700 dark:bg-[#1a222c] dark:text-slate-200 dark:hover:bg-slate-800",
@@ -189,12 +189,12 @@ export function PlannedDayCard({
         {day.votingOpen && day.myVote !== null && (
           <p className="mt-2 text-xs muted">
             Du hast mit {day.myVote === 1 ? "Ja" : "Nein"} gestimmt. Nochmal tippen nimmt die Stimme
-            zurueck. Aenderbar bis {formatDateTime(day.deadline)} Uhr.
+            zurück. Änderbar bis {formatDateTime(day.deadline)} Uhr.
           </p>
         )}
         {day.votingOpen && day.myVote === null && (
           <p className="mt-2 text-xs muted">
-            Abstimmen moeglich bis {formatDateTime(day.deadline)} Uhr.
+            Abstimmen möglich bis {formatDateTime(day.deadline)} Uhr.
           </p>
         )}
       </div>

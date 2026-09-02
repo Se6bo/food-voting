@@ -40,9 +40,9 @@ export function RegisterPage() {
     setError(null);
     setFields({});
 
-    // Frueher Hinweis noch vor dem Request - spart eine Runde.
+    // Früher Hinweis noch vor dem Request - spart eine Runde.
     if (form.password !== form.passwordConfirm) {
-      setFields({ passwordConfirm: "Die Passwoerter stimmen nicht ueberein." });
+      setFields({ passwordConfirm: "Die Passwörter stimmen nicht überein." });
       return;
     }
 
@@ -136,7 +136,7 @@ export function RegisterPage() {
 
             <div>
               <label className="label" htmlFor="passwordConfirm">
-                Passwort bestaetigen
+                Passwort bestätigen
               </label>
               <input
                 id="passwordConfirm"
