@@ -193,6 +193,19 @@ ausgegebene URL öffnen und mit der `ADMIN_EMAIL` registrieren.
 > Session-Cookie mit `Secure` – die Anwendung muss also über HTTPS laufen.
 > Bei Cloudflare ist das der Standard.
 
+### 7. Logs ansehen
+
+`wrangler.toml` aktiviert für `env.production` Workers Logs
+(`[env.production.observability]`). Damit erscheinen Server-Logs – inklusive
+`console.error`/`console.log`, u. a. die differenzierten Cookidoo-
+Fehlermeldungen – im Cloudflare-Dashboard unter **Workers & Pages →
+food-voting → Tab „Logs"**, sobald danach neu deployt wurde (nach
+`npm run deploy` bzw. dem nächsten automatischen Cloudflare-Build). Ein
+CLI-Aufruf wie `wrangler tail` ist dafür nicht mehr nötig. Eine eventuell in
+den Cloudflare-Projekteinstellungen selbst eingerichtete Git-Integration
+(automatischer Build bei Push) ist von diesem Repository aus nicht
+einsehbar – im Repo selbst liegt kein `.github/workflows`-Workflow.
+
 ---
 
 ## API

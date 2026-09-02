@@ -14,8 +14,20 @@
 
 import type { IngredientInput } from "../../shared/types";
 import type { Env } from "./env";
+import { isMissingMigrationError, MIGRATION_0002_MISSING_MESSAGE } from "./db-errors";
 
 export class CookidooError extends Error {}
+
+/** Cookidoo-Anmeldung ist fehlgeschlagen (z. B. falsche Zugangsdaten). */
+export class CookidooAuthError extends CookidooError {}
+
+/**
+ * D1-Zugriff ist fehlgeschlagen, weil migrations/0002_cookidoo.sql auf der
+ * Ziel-Datenbank noch nicht angewendet wurde (Tabelle/Spalte fehlt). Kein
+ * `CookidooError`, damit die Route dafür einen eigenen Status (503 statt
+ * 502) liefern kann.
+ */
+export class CookidooMigrationMissingError extends Error {}
 
 const CIAM_BASE_URL = "https://ciam.prod.cookidoo.vorwerk-digital.com";
 const CIAM_LOGIN_SRV_URL = `${CIAM_BASE_URL}/login-srv/login`;
@@ -84,25 +96,40 @@ function nowSeconds(): number {
 // -----------------------------------------------------------------------
 
 async function loadStoredSession(env: Env): Promise<StoredSession | null> {
-  const row = await env.DB.prepare(
-    "SELECT access_token, refresh_token, expires_at FROM cookidoo_session WHERE id = 1",
-  ).first<{ access_token: string; refresh_token: string; expires_at: number }>();
+  let row: { access_token: string; refresh_token: string; expires_at: number } | null;
+  try {
+    row = await env.DB.prepare(
+      "SELECT access_token, refresh_token, expires_at FROM cookidoo_session WHERE id = 1",
+    ).first<{ access_token: string; refresh_token: string; expires_at: number }>();
+  } catch (err) {
+    if (isMissingMigrationError(err)) {
+      throw new CookidooMigrationMissingError(MIGRATION_0002_MISSING_MESSAGE);
+    }
+    throw err;
+  }
   if (!row) return null;
   return { accessToken: row.access_token, refreshToken: row.refresh_token, expiresAt: row.expires_at };
 }
 
 async function saveSession(env: Env, session: StoredSession): Promise<void> {
-  await env.DB.prepare(
-    `INSERT INTO cookidoo_session (id, access_token, refresh_token, expires_at, updated_at)
-     VALUES (1, ?, ?, ?, datetime('now'))
-     ON CONFLICT(id) DO UPDATE SET
-       access_token = excluded.access_token,
-       refresh_token = excluded.refresh_token,
-       expires_at = excluded.expires_at,
-       updated_at = datetime('now')`,
-  )
-    .bind(session.accessToken, session.refreshToken, session.expiresAt)
-    .run();
+  try {
+    await env.DB.prepare(
+      `INSERT INTO cookidoo_session (id, access_token, refresh_token, expires_at, updated_at)
+       VALUES (1, ?, ?, ?, datetime('now'))
+       ON CONFLICT(id) DO UPDATE SET
+         access_token = excluded.access_token,
+         refresh_token = excluded.refresh_token,
+         expires_at = excluded.expires_at,
+         updated_at = datetime('now')`,
+    )
+      .bind(session.accessToken, session.refreshToken, session.expiresAt)
+      .run();
+  } catch (err) {
+    if (isMissingMigrationError(err)) {
+      throw new CookidooMigrationMissingError(MIGRATION_0002_MISSING_MESSAGE);
+    }
+    throw err;
+  }
 }
 
 // -----------------------------------------------------------------------
@@ -284,7 +311,7 @@ async function submitCredentials(
     body = undefined;
   }
 
-  throw new CookidooError(
+  throw new CookidooAuthError(
     "Cookidoo-Login fehlgeschlagen. Bitte COOKIDOO_EMAIL und COOKIDOO_PASSWORD prüfen.",
   );
 }
@@ -384,7 +411,10 @@ async function ensureAccessToken(env: Env, forceRelogin = false): Promise<string
         const refreshed = await refreshSession(stored.refreshToken);
         await saveSession(env, refreshed);
         return refreshed.accessToken;
-      } catch {
+      } catch (err) {
+        // Fehlende Migration soll sichtbar bleiben, nicht als abgelaufener
+        // Refresh-Token missgedeutet werden.
+        if (err instanceof CookidooMigrationMissingError) throw err;
         // Refresh-Token abgelaufen/ungültig - unten wird neu eingeloggt.
       }
     }

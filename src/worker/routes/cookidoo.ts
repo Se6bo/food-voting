@@ -2,7 +2,14 @@ import { Hono } from "hono";
 import type { Env } from "../lib/env";
 import type { AppContext, AppVariables } from "../lib/auth";
 import { requireAuth } from "../lib/auth";
-import { CookidooError, getCookidooRecipeDetails, isCookidooEnabled, searchCookidooRecipes } from "../lib/cookidoo";
+import {
+  CookidooAuthError,
+  CookidooError,
+  CookidooMigrationMissingError,
+  getCookidooRecipeDetails,
+  isCookidooEnabled,
+  searchCookidooRecipes,
+} from "../lib/cookidoo";
 
 const cookidoo = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
@@ -40,8 +47,26 @@ cookidoo.get("/recipes/:id", requireAuth, async (c) => {
  * Login-/Netzwerkfehler gegenüber Cookidoo werden nie mit Details (Zugangs-
  * daten, Stacktraces) an den Client durchgereicht - nur eine verständliche
  * deutsche Meldung, passend zur zentralen Fehlerkonvention aus index.ts.
+ *
+ * Die drei Fehlerarten werden bewusst unterschieden, damit beim nächsten
+ * Auftreten ohne Log-Zugriff sofort erkennbar ist, was schiefging:
+ *  - fehlende Migration (D1: "no such table"/"no such column") -> 503 mit
+ *    Anleitung, statt als generischer 502 zu verschwinden.
+ *  - fehlgeschlagener Cookidoo-Login (falsche Zugangsdaten) -> 502, aber mit
+ *    der konkreten, bereits nutzersicheren `CookidooError`-Meldung statt der
+ *    generischen Subject-Meldung.
+ *  - alles andere (Netzwerk, Cloudflare-Bot-Block, Timeout, ...) -> 502 mit
+ *    generischer Meldung wie bisher.
  */
 function cookidooErrorResponse(c: AppContext, err: unknown, subject: string) {
+  if (err instanceof CookidooMigrationMissingError) {
+    console.error("Cookidoo-Fehler (Migration fehlt):", err.message);
+    return c.json({ error: err.message }, 503);
+  }
+  if (err instanceof CookidooAuthError) {
+    console.error("Cookidoo-Fehler (Login):", err.message);
+    return c.json({ error: err.message }, 502);
+  }
   if (err instanceof CookidooError) {
     console.error("Cookidoo-Fehler:", err.message);
   } else {

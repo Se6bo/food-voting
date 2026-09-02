@@ -43,3 +43,14 @@ not_found_handling = "single-page-application"
 
 [env.production.vars]
 ENVIRONMENT = "production"
+
+# Workers Logs: persistente, im Cloudflare-Dashboard einsehbare Logs
+# (console.log/console.error), ohne dass "wrangler tail" laufen muss.
+[env.production.observability]
+enabled = true
+head_sampling_rate = 1
+
+[env.production.observability.logs]
+enabled = true
+head_sampling_rate = 1
+invocation_logs = true

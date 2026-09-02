@@ -4,6 +4,7 @@ import type { Env } from "../lib/env";
 import type { AppVariables } from "../lib/auth";
 import { currentUser, requireAuth } from "../lib/auth";
 import { newId } from "../lib/ids";
+import { isMissingMigrationError, MIGRATION_0002_MISSING_MESSAGE } from "../lib/db-errors";
 import {
   ValidationError,
   optionalAmount,
@@ -168,11 +169,19 @@ meals.post("/", async (c) => {
   const cookidooId = cookidooUrl ? extractCookidooId(cookidooUrl) : null;
 
   const id = newId();
-  await c.env.DB.prepare(
-    "INSERT INTO meals (id, name, description, image, created_by, cookidoo_id, cookidoo_url) VALUES (?, ?, ?, ?, ?, ?, ?)",
-  )
-    .bind(id, name, description, image, user.id, cookidooId, cookidooUrl)
-    .run();
+  try {
+    await c.env.DB.prepare(
+      "INSERT INTO meals (id, name, description, image, created_by, cookidoo_id, cookidoo_url) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    )
+      .bind(id, name, description, image, user.id, cookidooId, cookidooUrl)
+      .run();
+  } catch (err) {
+    // cookidoo_id/cookidoo_url kommen aus migrations/0002_cookidoo.sql - ohne
+    // die Migration schlägt jede Erstellung eines Essens mit einem D1-Fehler
+    // fehl, den wir hier klar von echten Serverfehlern unterscheiden.
+    if (isMissingMigrationError(err)) return c.json({ error: MIGRATION_0002_MISSING_MESSAGE }, 503);
+    throw err;
+  }
   if (ingredients.length > 0) await replaceIngredients(c.env, id, ingredients);
 
   const [meal] = await loadMeals(c.env, user, [id]);
@@ -201,12 +210,17 @@ meals.put("/:id", async (c) => {
   const cookidooUrl = optionalCookidooUrl(body.cookidooUrl);
   const cookidooId = cookidooUrl ? extractCookidooId(cookidooUrl) : null;
 
-  await c.env.DB.prepare(
-    `UPDATE meals SET name = ?, description = ?, image = ?, cookidoo_id = ?, cookidoo_url = ?,
-       updated_at = datetime('now') WHERE id = ?`,
-  )
-    .bind(name, description, image, cookidooId, cookidooUrl, id)
-    .run();
+  try {
+    await c.env.DB.prepare(
+      `UPDATE meals SET name = ?, description = ?, image = ?, cookidoo_id = ?, cookidoo_url = ?,
+         updated_at = datetime('now') WHERE id = ?`,
+    )
+      .bind(name, description, image, cookidooId, cookidooUrl, id)
+      .run();
+  } catch (err) {
+    if (isMissingMigrationError(err)) return c.json({ error: MIGRATION_0002_MISSING_MESSAGE }, 503);
+    throw err;
+  }
   await replaceIngredients(c.env, id, ingredients);
 
   const [meal] = await loadMeals(c.env, user, [id]);
