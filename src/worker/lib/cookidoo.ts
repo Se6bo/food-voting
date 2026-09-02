@@ -185,12 +185,21 @@ function isRedirectStatus(status: number): boolean {
   return status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
 }
 
+// Der Login-Flow leitet nach dem Absenden der Zugangsdaten (Erfolg wie
+// Fehler, z. B. "invalid_username_password") empirisch nicht auf
+// CIAM_BASE_URL zurück, sondern auf die separate Login-UI unter
+// eu.login.vorwerk.com - beide Hosts gehören zum selben offiziellen
+// Cookidoo-Login-Flow und sind deshalb hier explizit als vertrauenswürdig
+// gelistet (Hostname-Vergleich, kein String-Contains/Suffix-Vergleich, um
+// z. B. "evilciam.prod.cookidoo.vorwerk-digital.com.attacker.com" sicher
+// abzulehnen).
+const TRUSTED_LOGIN_HOSTS = new Set(["ciam.prod.cookidoo.vorwerk-digital.com", "eu.login.vorwerk.com"]);
+
 function assertCiamOrigin(url: string): void {
   // Die Redirect-Kette trägt die Cookies eines laufenden Logins - ein
   // Redirect auf einen fremden Host wird deshalb nicht befolgt.
   const target = new URL(url);
-  const expected = new URL(CIAM_BASE_URL);
-  if (target.protocol !== expected.protocol || target.host !== expected.host) {
+  if (target.protocol !== "https:" || !TRUSTED_LOGIN_HOSTS.has(target.hostname)) {
     throw new CookidooError("Cookidoo-Login wurde außerhalb der Login-Domain weitergeleitet.");
   }
 }
