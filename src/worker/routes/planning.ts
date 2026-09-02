@@ -16,6 +16,7 @@ interface PlannedRow {
   meal_name: string;
   meal_description: string | null;
   meal_image: string | null;
+  meal_cookidoo_url: string | null;
   yes_votes: number;
   no_votes: number;
   my_vote: number | null;
@@ -35,6 +36,7 @@ export async function loadPlannedDays(
     `SELECT md.id, md.date, md.voting_open,
             m.id AS meal_id, m.name AS meal_name,
             m.description AS meal_description, m.image AS meal_image,
+            m.cookidoo_url AS meal_cookidoo_url,
             COALESCE(SUM(CASE WHEN v.vote = 1 THEN 1 ELSE 0 END), 0) AS yes_votes,
             COALESCE(SUM(CASE WHEN v.vote = -1 THEN 1 ELSE 0 END), 0) AS no_votes,
             MAX(CASE WHEN v.user_id = ?1 THEN v.vote END) AS my_vote
@@ -83,6 +85,7 @@ export async function loadPlannedDays(
         description: row.meal_description,
         image: row.meal_image,
         ingredients: ingredientsByMeal.get(row.meal_id) ?? [],
+        cookidooUrl: row.meal_cookidoo_url,
       },
       votes: {
         yes,

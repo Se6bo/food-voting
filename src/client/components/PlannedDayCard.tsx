@@ -106,6 +106,16 @@ export function PlannedDayCard({
         {day.meal.description && (
           <p className="mt-1.5 text-sm muted">{day.meal.description}</p>
         )}
+        {day.meal.cookidooUrl && (
+          <a
+            href={day.meal.cookidooUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1.5 inline-flex w-fit items-center gap-1 text-xs font-medium text-brand-600 hover:underline dark:text-brand-400"
+          >
+            Rezept auf Cookidoo öffnen ↗
+          </a>
+        )}
 
         {showIngredients && ingredients.length > 0 && (
           <div className="mt-3">

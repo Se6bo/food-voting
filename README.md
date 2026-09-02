@@ -229,6 +229,9 @@ Session und einen passenden `Origin`-Header.
 | `GET` | `/api/admin/votes` | Alle Abstimmungen (Admin) |
 | `PUT` | `/api/admin/votes/:id` | Abstimmung öffnen/schließen (Admin) |
 | `GET` `PUT` | `/api/admin/settings` | Systemeinstellungen (Admin) |
+| `GET` | `/api/cookidoo/status` | Ist der Cookidoo-Import aktiviert? |
+| `GET` | `/api/cookidoo/search?q=...` | Cookidoo-Rezepte suchen |
+| `GET` | `/api/cookidoo/recipes/:id` | Rezeptdetails für den Import |
 
 ---
 
@@ -308,6 +311,40 @@ Umrechnung (Prise, Bund, Dose, Packung, Zehe …), jeweils mit und ohne Umlaute.
 Der Haken-Zustand bleibt erhalten, wenn sich der Plan ändert; ändert sich die
 Menge, wird sie aktualisiert. Verschwindet ein Essen aus dem Plan, verschwindet
 auch seine Zutat.
+
+---
+
+## Cookidoo-Import
+
+Essen lassen sich optional direkt aus Thermomix **Cookidoo** übernehmen: im
+Formular "Essen hinzufügen" nach einem Rezept suchen und mit "Übernehmen"
+Titel, Bild und die vollständige Zutatenliste ins Formular vorausfüllen.
+Danach lässt sich alles noch anpassen, bevor gespeichert wird.
+
+Das läuft über den **eigenen Cookidoo-Account des Betreibers** (ein Konto für
+die ganze App, nicht pro Benutzer) und eine **inoffizielle, reverse-
+engineerte API** von Vorwerk - es gibt dafür keine öffentliche/offizielle
+Schnittstelle. Das bedeutet konkret:
+
+- Es wird ausschließlich für den privaten Gebrauch des eigenen Abos genutzt.
+- Cookidoo kann seine interne API jederzeit ohne Vorwarnung ändern; der
+  Import kann dadurch jederzeit aufhören zu funktionieren, ohne dass diese
+  App etwas falsch gemacht hat. Betroffen sind nur Suche und Übernahme -
+  der Rest der App läuft unabhängig davon weiter.
+- Ohne gesetzte Zugangsdaten ist das Feature vollständig deaktiviert
+  (`GET /api/cookidoo/status` liefert `{ "enabled": false }`), nichts stürzt ab.
+
+### Aktivieren
+
+```bash
+npx wrangler secret put COOKIDOO_EMAIL
+npx wrangler secret put COOKIDOO_PASSWORD
+npm run deploy
+```
+
+Für lokale Entwicklung stattdessen `COOKIDOO_EMAIL` und `COOKIDOO_PASSWORD`
+in `.dev.vars` eintragen (bleibt wie gehabt in `.gitignore` und wird nie
+committet).
 
 ---
 

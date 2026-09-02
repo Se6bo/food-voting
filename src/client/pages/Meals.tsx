@@ -117,6 +117,17 @@ export function MealsPage() {
                 </h2>
                 {meal.description && <p className="mt-1.5 line-clamp-3 text-sm muted">{meal.description}</p>}
 
+                {meal.cookidooUrl && (
+                  <a
+                    href={meal.cookidooUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1.5 inline-flex w-fit items-center gap-1 text-xs font-medium text-brand-600 hover:underline dark:text-brand-400"
+                  >
+                    Rezept auf Cookidoo öffnen ↗
+                  </a>
+                )}
+
                 {meal.ingredients.length > 0 && (
                   <ul className="mt-3 space-y-1 text-sm muted">
                     {meal.ingredients.slice(0, 4).map((ingredient) => (

@@ -11,6 +11,20 @@ interface IngredientRow extends IngredientInput {
   key: string;
 }
 
+interface CookidooHit {
+  id: string;
+  title: string;
+  image: string | null;
+}
+
+interface CookidooRecipe {
+  name: string;
+  description: string | null;
+  image: string | null;
+  ingredients: IngredientInput[];
+  cookidooUrl: string;
+}
+
 const COMMON_UNITS = ["g", "kg", "ml", "l", "Stk", "TL", "EL", "Prise", "Bund", "Dose", "Packung", "Zehe"];
 
 function emptyRow(): IngredientRow {
@@ -28,11 +42,26 @@ export function MealFormPage() {
   const [image, setImage] = useState("");
   const [rows, setRows] = useState<IngredientRow[]>([emptyRow()]);
   const [planDate, setPlanDate] = useState("");
+  const [cookidooUrl, setCookidooUrl] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
+
+  // Cookidoo-Import
+  const [cookidooEnabled, setCookidooEnabled] = useState(false);
+  const [cookidooQuery, setCookidooQuery] = useState("");
+  const [cookidooResults, setCookidooResults] = useState<CookidooHit[]>([]);
+  const [cookidooSearching, setCookidooSearching] = useState(false);
+  const [cookidooImportingId, setCookidooImportingId] = useState<string | null>(null);
+  const [cookidooError, setCookidooError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api
+      .getOrDefault<{ enabled: boolean }>("/cookidoo/status", { enabled: false })
+      .then((data) => setCookidooEnabled(data.enabled));
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -42,6 +71,7 @@ export function MealFormPage() {
         setName(meal.name);
         setDescription(meal.description ?? "");
         setImage(meal.image ?? "");
+        setCookidooUrl(meal.cookidooUrl);
         setRows(
           meal.ingredients.length > 0
             ? meal.ingredients.map((ingredient) => ({
@@ -58,6 +88,49 @@ export function MealFormPage() {
       )
       .finally(() => setLoading(false));
   }, [id]);
+
+  async function runCookidooSearch() {
+    const query = cookidooQuery.trim();
+    if (!query) return;
+    setCookidooSearching(true);
+    setCookidooError(null);
+    try {
+      const data = await api.get<{ recipes: CookidooHit[] }>(
+        `/cookidoo/search?q=${encodeURIComponent(query)}`,
+      );
+      setCookidooResults(data.recipes);
+    } catch (err) {
+      setCookidooError(
+        err instanceof ApiRequestError ? err.message : "Die Cookidoo-Suche ist fehlgeschlagen.",
+      );
+    } finally {
+      setCookidooSearching(false);
+    }
+  }
+
+  async function importCookidooRecipe(hit: CookidooHit) {
+    setCookidooImportingId(hit.id);
+    setCookidooError(null);
+    try {
+      const recipe = await api.get<CookidooRecipe>(`/cookidoo/recipes/${encodeURIComponent(hit.id)}`);
+      setName(recipe.name);
+      setDescription(recipe.description ?? "");
+      setImage(recipe.image ?? "");
+      setCookidooUrl(recipe.cookidooUrl);
+      setRows(
+        recipe.ingredients.length > 0
+          ? recipe.ingredients.map((ingredient) => ({ key: crypto.randomUUID(), ...ingredient }))
+          : [emptyRow()],
+      );
+      toast.success(`"${recipe.name}" wurde übernommen. Bitte prüfen und dann speichern.`);
+    } catch (err) {
+      setCookidooError(
+        err instanceof ApiRequestError ? err.message : "Das Rezept konnte nicht übernommen werden.",
+      );
+    } finally {
+      setCookidooImportingId(null);
+    }
+  }
 
   function updateRow(key: string, patch: Partial<IngredientRow>) {
     setRows((prev) => prev.map((row) => (row.key === key ? { ...row, ...patch } : row)));
@@ -86,6 +159,7 @@ export function MealFormPage() {
       description: description || null,
       image: image || null,
       ingredients,
+      cookidooUrl,
     };
 
     try {
@@ -137,6 +211,83 @@ export function MealFormPage() {
 
       <form onSubmit={handleSubmit} className="space-y-6" noValidate>
         {error && <Alert kind="error">{error}</Alert>}
+
+        {cookidooEnabled && (
+          <section className="card space-y-4 p-5 sm:p-6">
+            <div>
+              <h2 className="section-title">Aus Cookidoo importieren</h2>
+              <p className="mt-1 text-sm muted">
+                Rezept aus deinem Cookidoo-Account suchen und mit einem Klick als Essen übernehmen -
+                du kannst danach noch alles anpassen.
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <input
+                className="input flex-1"
+                placeholder="z. B. Linsensuppe"
+                value={cookidooQuery}
+                onChange={(e) => setCookidooQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void runCookidooSearch();
+                  }
+                }}
+                aria-label="Cookidoo durchsuchen"
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                loading={cookidooSearching}
+                onClick={() => void runCookidooSearch()}
+              >
+                Suchen
+              </Button>
+            </div>
+
+            {cookidooError && <Alert kind="error">{cookidooError}</Alert>}
+
+            {cookidooResults.length > 0 && (
+              <ul className="grid gap-2 sm:grid-cols-2">
+                {cookidooResults.map((hit) => (
+                  <li
+                    key={hit.id}
+                    className="flex items-center gap-3 rounded-xl border border-slate-200 p-2.5 dark:border-slate-800"
+                  >
+                    {hit.image ? (
+                      <img
+                        src={hit.image}
+                        alt=""
+                        loading="lazy"
+                        className="h-12 w-12 shrink-0 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <span
+                        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-lg dark:bg-slate-800"
+                        aria-hidden="true"
+                      >
+                        🍽️
+                      </span>
+                    )}
+                    <span className="min-w-0 flex-1 break-words text-sm font-medium">{hit.title}</span>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      loading={cookidooImportingId === hit.id}
+                      onClick={() => void importCookidooRecipe(hit)}
+                    >
+                      Übernehmen
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
+
+        {/* Wird nur mitgeschickt, nicht direkt bearbeitet - Ursprung des Imports. */}
+        <input type="hidden" name="cookidooUrl" value={cookidooUrl ?? ""} />
 
         <section className="card space-y-5 p-5 sm:p-6">
           <div>

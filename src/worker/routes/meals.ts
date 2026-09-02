@@ -7,6 +7,7 @@ import { newId } from "../lib/ids";
 import {
   ValidationError,
   optionalAmount,
+  optionalCookidooUrl,
   optionalImageUrl,
   optionalString,
   requireString,
@@ -23,6 +24,14 @@ interface MealRow {
   created_by_name: string | null;
   created_at: string;
   updated_at: string;
+  cookidoo_id: string | null;
+  cookidoo_url: string | null;
+}
+
+/** Extrahiert die Rezept-ID aus einer Cookidoo-URL (letztes Pfadsegment). */
+function extractCookidooId(url: string): string | null {
+  const match = url.match(/\/recipes\/recipe\/[^/]+\/([^/?#]+)/);
+  return match ? match[1] : null;
 }
 
 interface IngredientRow {
@@ -115,6 +124,7 @@ export async function loadMeals(
     ingredients: byMeal.get(row.id) ?? [],
     // Berechtigung kommt vom Server, nicht vom Client.
     canEdit: viewer.role === "admin" || row.created_by === viewer.id,
+    cookidooUrl: row.cookidoo_url,
   }));
 }
 
@@ -154,12 +164,14 @@ meals.post("/", async (c) => {
   const description = optionalString(body.description, 2000);
   const image = optionalImageUrl(body.image);
   const ingredients = parseIngredients(body.ingredients);
+  const cookidooUrl = optionalCookidooUrl(body.cookidooUrl);
+  const cookidooId = cookidooUrl ? extractCookidooId(cookidooUrl) : null;
 
   const id = newId();
   await c.env.DB.prepare(
-    "INSERT INTO meals (id, name, description, image, created_by) VALUES (?, ?, ?, ?, ?)",
+    "INSERT INTO meals (id, name, description, image, created_by, cookidoo_id, cookidoo_url) VALUES (?, ?, ?, ?, ?, ?, ?)",
   )
-    .bind(id, name, description, image, user.id)
+    .bind(id, name, description, image, user.id, cookidooId, cookidooUrl)
     .run();
   if (ingredients.length > 0) await replaceIngredients(c.env, id, ingredients);
 
@@ -186,11 +198,14 @@ meals.put("/:id", async (c) => {
   const description = optionalString(body.description, 2000);
   const image = optionalImageUrl(body.image);
   const ingredients = parseIngredients(body.ingredients);
+  const cookidooUrl = optionalCookidooUrl(body.cookidooUrl);
+  const cookidooId = cookidooUrl ? extractCookidooId(cookidooUrl) : null;
 
   await c.env.DB.prepare(
-    "UPDATE meals SET name = ?, description = ?, image = ?, updated_at = datetime('now') WHERE id = ?",
+    `UPDATE meals SET name = ?, description = ?, image = ?, cookidoo_id = ?, cookidoo_url = ?,
+       updated_at = datetime('now') WHERE id = ?`,
   )
-    .bind(name, description, image, id)
+    .bind(name, description, image, cookidooId, cookidooUrl, id)
     .run();
   await replaceIngredients(c.env, id, ingredients);
 

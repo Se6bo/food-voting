@@ -114,6 +114,30 @@ export function optionalImageUrl(value: unknown): string | null {
   return url.toString();
 }
 
+/**
+ * Link zum Original-Rezept, der beim Cookidoo-Import mitgeschickt wird.
+ * Bewusst auf die eine Domain beschränkt, die dieser Import erzeugt - so
+ * kann niemand beliebige Links als "Cookidoo-Rezept" unterschieben.
+ */
+export function optionalCookidooUrl(value: unknown): string | null {
+  const raw = optionalString(value, 500);
+  if (!raw) return null;
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new ValidationError("Ungültiger Cookidoo-Link.", {
+      cookidooUrl: "Der Cookidoo-Link ist ungültig.",
+    });
+  }
+  if (url.protocol !== "https:" || url.hostname !== "cookidoo.de") {
+    throw new ValidationError("Ungültiger Cookidoo-Link.", {
+      cookidooUrl: "Nur Links zu cookidoo.de sind erlaubt.",
+    });
+  }
+  return url.toString();
+}
+
 export function requireBoolean(value: unknown, field: string): boolean {
   if (typeof value === "boolean") return value;
   throw new ValidationError("Ungültiger Wert.", { [field]: "Ungültiger Wert." });

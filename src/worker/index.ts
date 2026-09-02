@@ -12,6 +12,7 @@ import { planning } from "./routes/planning";
 import { votes } from "./routes/votes";
 import { shopping } from "./routes/shopping";
 import { admin } from "./routes/admin";
+import { cookidoo } from "./routes/cookidoo";
 
 const app = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
@@ -45,6 +46,7 @@ api.route("/planning", planning);
 api.route("/votes", votes);
 api.route("/shopping-list", shopping);
 api.route("/admin", admin);
+api.route("/cookidoo", cookidoo);
 
 api.notFound((c) => c.json({ error: "Diese Schnittstelle gibt es nicht." }, 404));
 

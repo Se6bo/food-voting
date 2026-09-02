@@ -43,6 +43,8 @@ export interface Meal {
   ingredients: Ingredient[];
   /** Darf der aktuelle Benutzer dieses Essen bearbeiten/löschen? */
   canEdit: boolean;
+  /** Link zum Original-Rezept auf Cookidoo, falls aus dem Import übernommen. */
+  cookidooUrl: string | null;
 }
 
 export interface VoteSummary {
@@ -62,6 +64,7 @@ export interface PlannedDay {
     description: string | null;
     image: string | null;
     ingredients: Ingredient[];
+    cookidooUrl: string | null;
   };
   votes: VoteSummary;
   myVote: VoteValue | null;
