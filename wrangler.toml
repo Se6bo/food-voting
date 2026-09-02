@@ -14,14 +14,32 @@ not_found_handling = "single-page-application"
 [[d1_databases]]
 binding = "DB"
 database_name = "food-voting-db"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "5acd4913-f89e-4305-9a14-3f98d6299416"
 migrations_dir = "migrations"
 
+# Top-Level-Konfiguration ist fuer "wrangler dev" (lokal, per --local
+# simulierte D1) - ENVIRONMENT bleibt hier "development", damit das
+# Session-Cookie ohne "Secure" auskommt (sonst wuerde der Browser es auf
+# http://localhost verwerfen).
 [vars]
 ENVIRONMENT = "development"
 
+# Bindings werden von Wrangler nicht automatisch an Environments vererbt,
+# daher hier erneut deklariert. "wrangler deploy --env production" ist das
+# tatsaechliche Deployment-Ziel (siehe package.json).
 [env.production]
 name = "food-voting"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "food-voting-db"
+database_id = "5acd4913-f89e-4305-9a14-3f98d6299416"
+migrations_dir = "migrations"
+
+[env.production.assets]
+directory = "./dist/client"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
 
 [env.production.vars]
 ENVIRONMENT = "production"
