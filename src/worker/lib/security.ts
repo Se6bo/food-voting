@@ -46,26 +46,44 @@ export const securityHeaders: MiddlewareHandler<{ Bindings: Env; Variables: AppV
   next,
 ) => {
   await next();
-  const headers = c.res.headers;
-  headers.set("X-Content-Type-Options", "nosniff");
-  headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  headers.set("X-Frame-Options", "DENY");
-  headers.set("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
-  if (!headers.has("Content-Security-Policy")) {
-    headers.set(
-      "Content-Security-Policy",
-      [
-        "default-src 'self'",
-        // Bilder duerfen von beliebigen https-Quellen kommen (Rezeptbilder).
-        "img-src 'self' https: data:",
-        "script-src 'self'",
-        "style-src 'self' 'unsafe-inline'",
-        "connect-src 'self'",
-        "frame-ancestors 'none'",
-        "base-uri 'self'",
-        "form-action 'self'",
-      ].join("; "),
-    );
+
+  const applyTo = (headers: Headers) => {
+    headers.set("X-Content-Type-Options", "nosniff");
+    headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+    headers.set("X-Frame-Options", "DENY");
+    headers.set("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+    if (!headers.has("Content-Security-Policy")) {
+      headers.set(
+        "Content-Security-Policy",
+        [
+          "default-src 'self'",
+          // Bilder duerfen von beliebigen https-Quellen kommen (Rezeptbilder).
+          "img-src 'self' https: data:",
+          "script-src 'self'",
+          "style-src 'self' 'unsafe-inline'",
+          "connect-src 'self'",
+          "frame-ancestors 'none'",
+          "base-uri 'self'",
+          "form-action 'self'",
+        ].join("; "),
+      );
+    }
+  };
+
+  try {
+    applyTo(c.res.headers);
+  } catch {
+    // Manche Antworten haben unveraenderliche Header - etwa Antworten aus
+    // ASSETS.fetch() oder aus dem Fehler-Handler. Dann bauen wir die Antwort
+    // mit denselben Daten neu auf, statt den Request scheitern zu lassen.
+    const original = c.res;
+    const headers = new Headers(original.headers);
+    applyTo(headers);
+    c.res = new Response(original.body, {
+      status: original.status,
+      statusText: original.statusText,
+      headers,
+    });
   }
 };
 

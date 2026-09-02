@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+  .dark {
+    color-scheme: dark;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+    @apply dark:bg-[#0b0f14] dark:text-slate-100;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+      "Helvetica Neue", Arial, sans-serif;
+  }
+
+  /* Sichtbarer Fokus fuer Tastaturbedienung - nie wegoptimieren. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-white dark:ring-offset-[#0b0f14];
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-slate-200 bg-white shadow-card;
+    @apply dark:border-slate-800 dark:bg-[#141a22];
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium;
+    @apply transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50;
+    /* Touch-Targets auf Mobile gross genug halten. */
+    @apply min-h-[44px];
+  }
+
+  .btn-primary {
+    @apply btn bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800;
+    @apply dark:bg-brand-500 dark:hover:bg-brand-400 dark:active:bg-brand-300 dark:text-slate-950;
+  }
+
+  .btn-secondary {
+    @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-50;
+    @apply dark:border-slate-700 dark:bg-[#1a222c] dark:text-slate-200 dark:hover:bg-[#212b37];
+  }
+
+  .btn-ghost {
+    @apply btn text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800;
+  }
+
+  .btn-danger {
+    @apply btn bg-red-600 text-white hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500;
+  }
+
+  .input {
+    @apply block w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-[16px] sm:text-sm;
+    @apply text-slate-900 placeholder:text-slate-400 shadow-sm transition-colors;
+    @apply focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30;
+    @apply dark:border-slate-700 dark:bg-[#1a222c] dark:text-slate-100 dark:placeholder:text-slate-500;
+    @apply disabled:opacity-60;
+  }
+
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300;
+  }
+
+  .field-error {
+    @apply mt-1.5 text-sm text-red-600 dark:text-red-400;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium;
+  }
+
+  .muted {
+    @apply text-slate-500 dark:text-slate-400;
+  }
+
+  .section-title {
+    @apply text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100;
+  }
+}

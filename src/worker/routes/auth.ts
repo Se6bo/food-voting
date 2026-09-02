@@ -20,7 +20,11 @@ import {
   requireString,
 } from "../lib/validation";
 
-const LOGIN_LIMIT = 8;
+// Pro Konto streng (verhindert gezieltes Durchprobieren eines Passworts),
+// pro IP deutlich lockerer: hinter einem gemeinsamen Anschluss (WG, NAT)
+// wuerde ein strenger IP-Zaehler sonst alle Mitbewohner aussperren.
+const LOGIN_LIMIT_PER_ACCOUNT = 8;
+const LOGIN_LIMIT_PER_IP = 40;
 const LOGIN_WINDOW_SECONDS = 15 * 60;
 
 const auth = new Hono<{ Bindings: Env; Variables: AppVariables }>();
@@ -93,8 +97,12 @@ auth.post("/login", async (c) => {
   // viele Konten durchprobieren noch ein Konto von vielen IPs aus.
   const ipKey = `ip:${clientIp(c.req.raw.headers)}`;
   const emailKey = `email:${email}`;
-  for (const key of [ipKey, emailKey]) {
-    const { allowed } = await checkRateLimit(c.env, key, LOGIN_LIMIT, LOGIN_WINDOW_SECONDS);
+  const limits: Array<[string, number]> = [
+    [emailKey, LOGIN_LIMIT_PER_ACCOUNT],
+    [ipKey, LOGIN_LIMIT_PER_IP],
+  ];
+  for (const [key, limit] of limits) {
+    const { allowed } = await checkRateLimit(c.env, key, limit, LOGIN_WINDOW_SECONDS);
     if (!allowed) {
       return c.json(
         { error: "Zu viele Login-Versuche. Bitte versuche es in 15 Minuten erneut." },
@@ -119,7 +127,9 @@ auth.post("/login", async (c) => {
     return c.json({ error: "E-Mail-Adresse oder Passwort ist falsch." }, 401);
   }
 
+  // Erfolgreicher Login raeumt beide Zaehler ab.
   await clearRateLimit(c.env, emailKey);
+  await clearRateLimit(c.env, ipKey);
   await createSession(c, row.id);
   c.executionCtx.waitUntil(purgeExpiredSessions(c.env));
 
