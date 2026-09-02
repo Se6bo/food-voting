@@ -3,13 +3,18 @@
  *
  * Warum PBKDF2 und nicht bcrypt/argon2? Cloudflare Workers bieten WebCrypto
  * nativ an; bcrypt/argon2 würden ein WASM-Modul und damit deutlich mehr
- * Bundle-Größe und Cold-Start-Zeit bedeuten. PBKDF2 mit 210.000 Iterationen
- * entspricht der aktuellen OWASP-Empfehlung für PBKDF2-HMAC-SHA256.
+ * Bundle-Größe und Cold-Start-Zeit bedeuten. Die OWASP-Empfehlung für
+ * PBKDF2-HMAC-SHA256 liegt bei 210.000 Iterationen, aber die WebCrypto-
+ * Implementierung der Workers-Runtime deckelt PBKDF2 hart bei 100.000
+ * Iterationen (undokumentiert in der lokalen Miniflare-Simulation, dort
+ * laufen auch höhere Werte durch - der Fehler zeigt sich erst im echten
+ * Deployment). Die Iterationszahl steht in jedem Hash mit drin, ein
+ * künftiges Hochsetzen braucht also keine Migration bestehender Hashes.
  *
  * Format: pbkdf2$<iterations>$<salt-b64>$<hash-b64>
  */
 
-const ITERATIONS = 210_000;
+const ITERATIONS = 100_000;
 const KEY_LENGTH_BITS = 256;
 const SALT_BYTES = 16;
 
