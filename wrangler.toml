@@ -1,0 +1,27 @@
+name = "food-voting"
+main = "src/worker/index.ts"
+compatibility_date = "2024-12-05"
+
+# Der gebaute React-Client wird direkt vom Worker ausgeliefert (Workers Static
+# Assets). Dadurch brauchen wir kein separates Pages-Projekt und Frontend und
+# API teilen sich dieselbe Origin -> keine CORS-Sonderfaelle, Cookies sind
+# First-Party.
+[assets]
+directory = "./dist/client"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "food-voting-db"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+[vars]
+ENVIRONMENT = "development"
+
+[env.production]
+name = "food-voting"
+
+[env.production.vars]
+ENVIRONMENT = "production"
