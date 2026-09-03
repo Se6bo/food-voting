@@ -23,7 +23,7 @@ interface AuthContextValue {
     email: string;
     password: string;
     passwordConfirm: string;
-    inviteCode?: string;
+    groupInviteCode?: string;
   }) => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: PublicUser) => void;
@@ -70,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: string;
       password: string;
       passwordConfirm: string;
-      inviteCode?: string;
+      groupInviteCode?: string;
     }) => {
       await api.post<{ user: PublicUser }>("/auth/register", data);
       await refresh();

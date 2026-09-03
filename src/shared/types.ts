@@ -15,6 +15,8 @@ export interface PublicUser {
   email: string;
   role: Role;
   createdAt: string;
+  /** Jeder Benutzer gehört genau einer Gruppe an (getrennter Essensplan). */
+  groupId: string | null;
 }
 
 export interface Ingredient {
@@ -55,9 +57,8 @@ export interface VoteSummary {
   approval: number;
 }
 
-export interface PlannedDay {
+export interface PlannedDayProposal {
   id: string;
-  date: string;
   meal: {
     id: string;
     name: string;
@@ -66,8 +67,25 @@ export interface PlannedDay {
     ingredients: Ingredient[];
     cookidooUrl: string | null;
   };
+  createdBy: string | null;
+  createdByName: string | null;
+  createdAt: string;
   votes: VoteSummary;
   myVote: VoteValue | null;
+}
+
+export interface PlannedDay {
+  id: string;
+  date: string;
+  /** Beliebig viele Rezeptvorschläge für diesen Tag statt einem festen Essen. */
+  proposals: PlannedDayProposal[];
+  /**
+   * ID des Vorschlags mit der höchsten Ja-minus-Nein-Differenz, sobald die
+   * Abstimmung geschlossen ist. Solange die Abstimmung offen ist (oder es
+   * keine Vorschläge gibt), ist der Gewinner unbekannt -> null. Wird nicht
+   * gespeichert, sondern bei jedem Lesezugriff serverseitig live berechnet.
+   */
+  winningProposalId: string | null;
   /** Serverseitig berechnet - der Client entscheidet das nie selbst. */
   votingOpen: boolean;
   /** Warum die Abstimmung geschlossen ist (für verständliche UI-Texte). */
@@ -94,6 +112,26 @@ export interface AppSettings {
   planningDaysAhead: number;
   registrationOpen: boolean;
   voteDeadlineHour: number;
+}
+
+/** Eigene Gruppe eines Benutzers (GET /api/groups/me). */
+export interface MyGroup {
+  id: string;
+  name: string;
+  inviteCode: string;
+  inviteUrl: string;
+  memberCount: number;
+  members: Array<{ id: string; name: string; email: string }>;
+}
+
+/** Gruppen-Metadaten in der Admin-Übersicht (GET /api/admin/groups). */
+export interface AdminGroup {
+  id: string;
+  name: string;
+  inviteCode: string;
+  inviteUrl: string;
+  memberCount: number;
+  createdAt: string;
 }
 
 export interface ApiError {

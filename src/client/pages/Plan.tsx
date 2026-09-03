@@ -14,7 +14,8 @@ interface PlanningResponse {
   range: { from: string; to: string };
 }
 
-/** Datum + Essen zuordnen. Steht allen offen; bestehende Tage ändert nur ein Admin. */
+/** Ein Essen für einen Tag vorschlagen. Steht allen offen - mehrere Vorschläge
+ * pro Tag sind erlaubt, solange die Abstimmung läuft. */
 function AssignDialog({
   open,
   onClose,
@@ -101,7 +102,8 @@ function AssignDialog({
           />
           {plannedDates.has(date) && (
             <p className="mt-1.5 text-sm text-amber-600 dark:text-amber-400">
-              Für diesen Tag ist bereits ein Essen geplant. Nur Admins können das ändern.
+              Für diesen Tag gibt es bereits Vorschläge. Weitere sind erlaubt, solange die
+              Abstimmung läuft.
             </p>
           )}
         </div>

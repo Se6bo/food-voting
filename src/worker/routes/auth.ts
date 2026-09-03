@@ -6,9 +6,11 @@ import {
   createUser,
   currentUser,
   destroySession,
+  loadUserById,
   purgeExpiredSessions,
   requireAuth,
 } from "../lib/auth";
+import { newId, newToken } from "../lib/ids";
 import { hashPassword, verifyPassword } from "../lib/password";
 import { checkRateLimit, clearRateLimit, clientIp, recordRateLimitAttempt } from "../lib/security";
 import { getSettings } from "../lib/settings";
@@ -54,13 +56,6 @@ auth.post("/register", async (c) => {
     return c.json({ error: "Die Registrierung ist derzeit deaktiviert." }, 403);
   }
 
-  const inviteCode = c.env.SIGNUP_INVITE_CODE?.trim();
-  if (inviteCode && !isConfiguredAdmin && body.inviteCode !== inviteCode) {
-    throw new ValidationError("Ungültiger Einladungscode.", {
-      inviteCode: "Der Einladungscode stimmt nicht.",
-    });
-  }
-
   const existing = await c.env.DB.prepare("SELECT id FROM users WHERE email_lower = ?")
     .bind(emailLower)
     .first<{ id: string }>();
@@ -77,8 +72,49 @@ auth.post("/register", async (c) => {
   }>();
   const role = isConfiguredAdmin || (userCount?.count ?? 0) === 0 ? "admin" : "user";
 
+  // Gruppen-Zuordnung: Wer einen gültigen Einladungscode angibt, tritt genau
+  // dieser Gruppe bei. Ohne Code (oder mit leerem Feld) wird automatisch eine
+  // brandneue, eigene Gruppe gegründet - die Registrierung setzt damit immer
+  // eine Gruppe, egal welcher Weg genommen wird. Ein unbekannter Code ist ein
+  // normaler Validierungsfehler wie bei jedem anderen Formularfeld.
+  const rawCode = typeof body.groupInviteCode === "string" ? body.groupInviteCode.trim() : "";
+  let groupId: string;
+  let createdGroupId: string | null = null;
+
+  if (rawCode) {
+    // Groß-/Kleinschreibung ignorieren, damit abgetippte Codes nicht an der
+    // Schreibweise scheitern (die generierten Codes mischen Groß- und Kleinbuchstaben).
+    const group = await c.env.DB.prepare(
+      "SELECT id FROM groups WHERE LOWER(invite_code) = LOWER(?)",
+    )
+      .bind(rawCode)
+      .first<{ id: string }>();
+    if (!group) {
+      throw new ValidationError("Unbekannter Einladungscode.", {
+        groupInviteCode:
+          "Dieser Einladungscode ist nicht gültig. Ohne Code bekommst du automatisch eine eigene neue Gruppe.",
+      });
+    }
+    groupId = group.id;
+  } else {
+    // Gruppe zuerst mit created_by = NULL anlegen (die User-ID existiert erst
+    // nach dem User-Insert) und unten nachziehen.
+    createdGroupId = newId();
+    await c.env.DB.prepare(
+      "INSERT INTO groups (id, name, invite_code, created_by) VALUES (?, ?, ?, NULL)",
+    )
+      .bind(createdGroupId, `Gruppe von ${name}`, newToken())
+      .run();
+    groupId = createdGroupId;
+  }
+
   const passwordHash = await hashPassword(password);
-  const user = await createUser(c.env, { name, email, passwordHash, role });
+  const user = await createUser(c.env, { name, email, passwordHash, role, groupId });
+  if (createdGroupId) {
+    await c.env.DB.prepare("UPDATE groups SET created_by = ? WHERE id = ?")
+      .bind(user.id, createdGroupId)
+      .run();
+  }
   await createSession(c, user.id);
 
   return c.json({ user }, 201);
@@ -133,21 +169,8 @@ auth.post("/login", async (c) => {
   await createSession(c, row.id);
   c.executionCtx.waitUntil(purgeExpiredSessions(c.env));
 
-  const user = await c.env.DB.prepare(
-    "SELECT id, name, email, role, created_at FROM users WHERE id = ?",
-  )
-    .bind(row.id)
-    .first<{ id: string; name: string; email: string; role: "user" | "admin"; created_at: string }>();
-
-  return c.json({
-    user: user && {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      createdAt: user.created_at,
-    },
-  });
+  const user = await loadUserById(c.env, row.id);
+  return c.json({ user });
 });
 
 auth.post("/logout", async (c) => {

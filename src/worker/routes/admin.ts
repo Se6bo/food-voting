@@ -1,7 +1,9 @@
 import { Hono } from "hono";
+import type { AdminGroup } from "../../shared/types";
 import type { Env } from "../lib/env";
 import type { AppVariables } from "../lib/auth";
 import { currentUser, destroyAllSessionsFor, requireAdmin } from "../lib/auth";
+import { newId, newToken } from "../lib/ids";
 import { getSettings, updateSettings } from "../lib/settings";
 import { addDays, todayInZone, votingState } from "../lib/time";
 import { ValidationError, requireString } from "../lib/validation";
@@ -19,7 +21,7 @@ admin.get("/users", async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT u.id, u.name, u.email, u.role, u.created_at,
             (SELECT COUNT(*) FROM meals m WHERE m.created_by = u.id) AS meal_count,
-            (SELECT COUNT(*) FROM votes v WHERE v.user_id = u.id) AS vote_count
+            (SELECT COUNT(*) FROM proposal_votes pv WHERE pv.user_id = u.id) AS vote_count
        FROM users u
       ORDER BY u.created_at ASC`,
   ).all<{
@@ -105,8 +107,90 @@ admin.delete("/users/:id", async (c) => {
 });
 
 // ---------------------------------------------------------------------------
-// Abstimmungen
+// Gruppenverwaltung
 // ---------------------------------------------------------------------------
+
+/** Einladungslink aus der Origin des Requests bauen (funktioniert lokal wie remote). */
+function inviteUrl(origin: string, code: string): string {
+  return `${origin}/registrieren?einladung=${encodeURIComponent(code)}`;
+}
+
+admin.get("/groups", async (c) => {
+  const origin = new URL(c.req.url).origin;
+  const { results } = await c.env.DB.prepare(
+    `SELECT g.id, g.name, g.invite_code, g.created_at,
+            COUNT(u.id) AS member_count
+       FROM groups g
+       LEFT JOIN users u ON u.group_id = g.id
+      GROUP BY g.id
+      ORDER BY g.created_at ASC`,
+  ).all<{
+    id: string;
+    name: string;
+    invite_code: string;
+    created_at: string;
+    member_count: number;
+  }>();
+
+  const groups: AdminGroup[] = results.map((row) => ({
+    id: row.id,
+    name: row.name,
+    inviteCode: row.invite_code,
+    inviteUrl: inviteUrl(origin, row.invite_code),
+    memberCount: row.member_count,
+    createdAt: row.created_at,
+  }));
+  return c.json({ groups });
+});
+
+admin.post("/groups", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const name = requireString(body.name, "name", { min: 2, max: 80, label: "Gruppenname" });
+
+  // Eine leere Gruppe ohne Mitglieder - der Einladungscode bringt später
+  // die ersten Mitglieder hinein.
+  const id = newId();
+  await c.env.DB.prepare(
+    "INSERT INTO groups (id, name, invite_code, created_by) VALUES (?, ?, ?, NULL)",
+  )
+    .bind(id, name, newToken())
+    .run();
+
+  return c.json({ ok: true }, 201);
+});
+
+admin.delete("/groups/:id", async (c) => {
+  const id = c.req.param("id");
+
+  const members = await c.env.DB.prepare("SELECT COUNT(*) AS count FROM users WHERE group_id = ?")
+    .bind(id)
+    .first<{ count: number }>();
+  if ((members?.count ?? 0) > 0) {
+    return c.json(
+      { error: "Nur Gruppen ohne Mitglieder können gelöscht werden." },
+      409,
+    );
+  }
+
+  // Leere Gruppen haben keine Daten außerhalb der Gruppe selbst; die
+  // ON DELETE CASCADE-Beziehungen (plan_days, meals, shopping_items) sind
+  // damit gegenstandslos.
+  const result = await c.env.DB.prepare("DELETE FROM groups WHERE id = ?").bind(id).run();
+  if (!result.meta.changes) return c.json({ error: "Diese Gruppe gibt es nicht (mehr)." }, 404);
+  return c.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// Abstimmungen (ein "Poll" = ein geplanter Tag mit beliebig vielen Vorschlägen)
+// ---------------------------------------------------------------------------
+
+interface PollProposalRow {
+  id: string;
+  plan_day_id: string;
+  created_at: string;
+  meal_name: string;
+  created_by_name: string | null;
+}
 
 admin.get("/votes", async (c) => {
   const settings = await getSettings(c.env);
@@ -114,49 +198,108 @@ admin.get("/votes", async (c) => {
   const from = c.req.query("from") ?? addDays(today, -14);
   const to = c.req.query("to") ?? addDays(today, settings.planningDaysAhead);
 
-  const { results } = await c.env.DB.prepare(
-    `SELECT md.id, md.date, md.voting_open, m.name AS meal_name,
-            COALESCE(SUM(CASE WHEN v.vote = 1 THEN 1 ELSE 0 END), 0) AS yes_votes,
-            COALESCE(SUM(CASE WHEN v.vote = -1 THEN 1 ELSE 0 END), 0) AS no_votes
-       FROM meal_days md
-       JOIN meals m ON m.id = md.meal_id
-       LEFT JOIN votes v ON v.meal_day_id = md.id
-      WHERE md.date >= ? AND md.date <= ?
-      GROUP BY md.id
-      ORDER BY md.date ASC`,
+  const { results: days } = await c.env.DB.prepare(
+    `SELECT pd.id, pd.date, pd.voting_open, g.name AS group_name
+       FROM plan_days pd
+       JOIN groups g ON g.id = pd.group_id
+      WHERE pd.date >= ? AND pd.date <= ?
+      ORDER BY pd.date ASC`,
   )
     .bind(from, to)
-    .all<{
-      id: string;
-      date: string;
-      voting_open: number;
-      meal_name: string;
-      yes_votes: number;
-      no_votes: number;
-    }>();
+    .all<{ id: string; date: string; voting_open: number; group_name: string }>();
+
+  let proposals: PollProposalRow[] = [];
+  let votes: Array<{ proposal_id: string; vote: number }> = [];
+  if (days.length > 0) {
+    const dayIds = days.map((day) => day.id);
+    const placeholders = dayIds.map(() => "?").join(", ");
+    const proposalResult = await c.env.DB.prepare(
+      `SELECT mp.id, mp.plan_day_id, mp.created_at, m.name AS meal_name,
+              u.name AS created_by_name
+         FROM meal_proposals mp
+         JOIN meals m ON m.id = mp.meal_id
+         LEFT JOIN users u ON u.id = mp.created_by
+        WHERE mp.plan_day_id IN (${placeholders})
+        ORDER BY mp.created_at ASC`,
+    )
+      .bind(...dayIds)
+      .all<PollProposalRow>();
+    proposals = proposalResult.results;
+
+    if (proposals.length > 0) {
+      const proposalIds = proposals.map((proposal) => proposal.id);
+      const votePlaceholders = proposalIds.map(() => "?").join(", ");
+      const voteResult = await c.env.DB.prepare(
+        `SELECT proposal_id, vote FROM proposal_votes
+          WHERE proposal_id IN (${votePlaceholders})`,
+      )
+        .bind(...proposalIds)
+        .all<{ proposal_id: string; vote: number }>();
+      votes = voteResult.results;
+    }
+  }
+
+  const votesByProposal = new Map<string, { yes: number; no: number }>();
+  for (const vote of votes) {
+    const summary = votesByProposal.get(vote.proposal_id) ?? { yes: 0, no: 0 };
+    if (vote.vote === 1) summary.yes += 1;
+    else summary.no += 1;
+    votesByProposal.set(vote.proposal_id, summary);
+  }
 
   const now = new Date();
   return c.json({
-    polls: results.map((row) => {
-      const state = votingState(row.date, row.voting_open === 1, settings.voteDeadlineHour, now);
-      const yes = Number(row.yes_votes);
-      const no = Number(row.no_votes);
-      const total = yes + no;
+    polls: days.map((day) => {
+      const state = votingState(day.date, day.voting_open === 1, settings.voteDeadlineHour, now);
+      const dayProposals = proposals
+        .filter((proposal) => proposal.plan_day_id === day.id)
+        .map((proposal) => {
+          const summary = votesByProposal.get(proposal.id) ?? { yes: 0, no: 0 };
+          const total = summary.yes + summary.no;
+          return {
+            id: proposal.id,
+            mealName: proposal.meal_name,
+            createdByName: proposal.created_by_name,
+            createdAt: proposal.created_at,
+            votes: {
+              yes: summary.yes,
+              no: summary.no,
+              total,
+              approval: total === 0 ? 0 : Math.round((summary.yes / total) * 100),
+            },
+          };
+        });
+      // Gewinner wie im Plan: höchste Ja-minus-Nein-Differenz (nur bei
+      // geschlossenen Tagen relevant).
+      let winnerProposalId: string | null = null;
+      if (!state.open && dayProposals.length > 0) {
+        let bestDiff = Number.NEGATIVE_INFINITY;
+        let bestYes = -1;
+        for (const proposal of dayProposals) {
+          const diff = proposal.votes.yes - proposal.votes.no;
+          if (diff > bestDiff || (diff === bestDiff && proposal.votes.yes > bestYes)) {
+            bestDiff = diff;
+            bestYes = proposal.votes.yes;
+            winnerProposalId = proposal.id;
+          }
+        }
+      }
       return {
-        id: row.id,
-        date: row.date,
-        mealName: row.meal_name,
-        adminOpen: row.voting_open === 1,
+        id: day.id,
+        date: day.date,
+        groupName: day.group_name,
+        adminOpen: day.voting_open === 1,
         open: state.open,
         closedReason: state.reason,
         deadline: state.deadline.toISOString(),
-        votes: { yes, no, total, approval: total === 0 ? 0 : Math.round((yes / total) * 100) },
+        proposals: dayProposals,
+        winnerProposalId,
       };
     }),
   });
 });
 
-/** Abstimmung manuell schließen oder wieder öffnen. */
+/** Abstimmung eines Tages manuell schließen oder wieder öffnen. */
 admin.put("/votes/:id", async (c) => {
   const id = c.req.param("id");
   const body = await c.req.json().catch(() => ({}));
@@ -164,31 +307,11 @@ admin.put("/votes/:id", async (c) => {
     throw new ValidationError("Ungültiger Wert.", { open: "Ungültiger Wert." });
   }
 
-  const result = await c.env.DB.prepare("UPDATE meal_days SET voting_open = ? WHERE id = ?")
+  const result = await c.env.DB.prepare("UPDATE plan_days SET voting_open = ? WHERE id = ?")
     .bind(body.open ? 1 : 0, id)
     .run();
   if (!result.meta.changes) return c.json({ error: "Diese Abstimmung existiert nicht." }, 404);
   return c.json({ ok: true });
-});
-
-/** Einzelne Stimmen eines Tages einsehen. */
-admin.get("/votes/:id/details", async (c) => {
-  const { results } = await c.env.DB.prepare(
-    `SELECT u.name AS user_name, v.vote, v.updated_at
-       FROM votes v JOIN users u ON u.id = v.user_id
-      WHERE v.meal_day_id = ?
-      ORDER BY v.updated_at DESC`,
-  )
-    .bind(c.req.param("id"))
-    .all<{ user_name: string; vote: number; updated_at: string }>();
-
-  return c.json({
-    votes: results.map((row) => ({
-      userName: row.user_name,
-      vote: row.vote > 0 ? 1 : -1,
-      updatedAt: row.updated_at,
-    })),
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -233,15 +356,15 @@ admin.put("/settings", async (c) => {
   return c.json({ settings: await getSettings(c.env) });
 });
 
-/** Kennzahlen für das Admin-Dashboard. */
+/** Kennzahlen für das Admin-Dashboard (gruppenübergreifend). */
 admin.get("/stats", async (c) => {
   const today = todayInZone();
   const row = await c.env.DB.prepare(
     `SELECT
        (SELECT COUNT(*) FROM users) AS users,
        (SELECT COUNT(*) FROM meals) AS meals,
-       (SELECT COUNT(*) FROM meal_days WHERE date >= ?1) AS planned,
-       (SELECT COUNT(*) FROM votes) AS votes,
+       (SELECT COUNT(*) FROM plan_days WHERE date >= ?1) AS planned,
+       (SELECT COUNT(*) FROM proposal_votes) AS votes,
        (SELECT COUNT(*) FROM shopping_items WHERE hidden = 0) AS shopping_items`,
   )
     .bind(today)

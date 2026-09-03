@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { Ingredient, IngredientInput, Meal } from "../../shared/types";
 import type { Env } from "../lib/env";
 import type { AppVariables } from "../lib/auth";
-import { currentUser, requireAuth } from "../lib/auth";
+import { currentUser, requireAuth, requireGroupId } from "../lib/auth";
 import { newId } from "../lib/ids";
 import { isMissingMigrationError, MIGRATION_0002_MISSING_MESSAGE } from "../lib/db-errors";
 import {
@@ -73,7 +73,7 @@ export function parseIngredients(value: unknown): IngredientInput[] {
 /** Lädt Essen inklusive Zutaten in zwei Abfragen statt N+1. */
 export async function loadMeals(
   env: Env,
-  viewer: { id: string; role: string },
+  viewer: { id: string; role: string; groupId: string },
   mealIds?: string[],
 ): Promise<Meal[]> {
   let mealRows: MealRow[];
@@ -83,17 +83,20 @@ export async function loadMeals(
     const { results } = await env.DB.prepare(
       `SELECT m.*, u.name AS created_by_name
          FROM meals m LEFT JOIN users u ON u.id = m.created_by
-        WHERE m.id IN (${placeholders})`,
+        WHERE m.group_id = ? AND m.id IN (${placeholders})`,
     )
-      .bind(...mealIds)
+      .bind(viewer.groupId, ...mealIds)
       .all<MealRow>();
     mealRows = results;
   } else {
     const { results } = await env.DB.prepare(
       `SELECT m.*, u.name AS created_by_name
          FROM meals m LEFT JOIN users u ON u.id = m.created_by
+        WHERE m.group_id = ?
         ORDER BY m.name COLLATE NOCASE ASC`,
-    ).all<MealRow>();
+    )
+      .bind(viewer.groupId)
+      .all<MealRow>();
     mealRows = results;
   }
   if (mealRows.length === 0) return [];
@@ -147,18 +150,26 @@ meals.use("*", requireAuth);
 
 meals.get("/", async (c) => {
   const user = currentUser(c);
-  return c.json({ meals: await loadMeals(c.env, user) });
+  // Ohne Gruppe gibt es für diesen Benutzer nichts zu sehen.
+  const groupId = requireGroupId(user);
+  return c.json({ meals: await loadMeals(c.env, { id: user.id, role: user.role, groupId }) });
 });
 
 meals.get("/:id", async (c) => {
   const user = currentUser(c);
-  const list = await loadMeals(c.env, user, [c.req.param("id")]);
+  const groupId = requireGroupId(user);
+  const list = await loadMeals(c.env, { id: user.id, role: user.role, groupId }, [
+    c.req.param("id"),
+  ]);
   if (list.length === 0) return c.json({ error: "Dieses Essen gibt es nicht (mehr)." }, 404);
   return c.json({ meal: list[0] });
 });
 
 meals.post("/", async (c) => {
   const user = currentUser(c);
+  // Die Gruppe kommt nie vom Client, sondern immer vom angemeldeten Benutzer -
+  // so kann niemand Essen in einer fremden Gruppe anlegen.
+  const groupId = requireGroupId(user);
   const body = await c.req.json().catch(() => ({}));
 
   const name = requireString(body.name, "name", { min: 2, max: 120, label: "Name des Essens" });
@@ -171,9 +182,9 @@ meals.post("/", async (c) => {
   const id = newId();
   try {
     await c.env.DB.prepare(
-      "INSERT INTO meals (id, name, description, image, created_by, cookidoo_id, cookidoo_url) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO meals (id, name, description, image, created_by, group_id, cookidoo_id, cookidoo_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     )
-      .bind(id, name, description, image, user.id, cookidooId, cookidooUrl)
+      .bind(id, name, description, image, user.id, groupId, cookidooId, cookidooUrl)
       .run();
   } catch (err) {
     // cookidoo_id/cookidoo_url kommen aus migrations/0002_cookidoo.sql - ohne
@@ -184,16 +195,21 @@ meals.post("/", async (c) => {
   }
   if (ingredients.length > 0) await replaceIngredients(c.env, id, ingredients);
 
-  const [meal] = await loadMeals(c.env, user, [id]);
+  const [meal] = await loadMeals(c.env, { id: user.id, role: user.role, groupId }, [id]);
   return c.json({ meal }, 201);
 });
 
 meals.put("/:id", async (c) => {
   const user = currentUser(c);
+  const groupId = requireGroupId(user);
   const id = c.req.param("id");
 
-  const existing = await c.env.DB.prepare("SELECT created_by FROM meals WHERE id = ?")
-    .bind(id)
+  // Gruppen-Check in der SELECT-Query: Ein Essen aus einer fremden Gruppe
+  // existiert für diesen Benutzer schlicht nicht (404, nicht 403).
+  const existing = await c.env.DB.prepare(
+    "SELECT created_by FROM meals WHERE id = ? AND group_id = ?",
+  )
+    .bind(id, groupId)
     .first<{ created_by: string | null }>();
   if (!existing) return c.json({ error: "Dieses Essen gibt es nicht (mehr)." }, 404);
 
@@ -223,16 +239,19 @@ meals.put("/:id", async (c) => {
   }
   await replaceIngredients(c.env, id, ingredients);
 
-  const [meal] = await loadMeals(c.env, user, [id]);
+  const [meal] = await loadMeals(c.env, { id: user.id, role: user.role, groupId }, [id]);
   return c.json({ meal });
 });
 
 meals.delete("/:id", async (c) => {
   const user = currentUser(c);
+  const groupId = requireGroupId(user);
   const id = c.req.param("id");
 
-  const existing = await c.env.DB.prepare("SELECT created_by FROM meals WHERE id = ?")
-    .bind(id)
+  const existing = await c.env.DB.prepare(
+    "SELECT created_by FROM meals WHERE id = ? AND group_id = ?",
+  )
+    .bind(id, groupId)
     .first<{ created_by: string | null }>();
   if (!existing) return c.json({ error: "Dieses Essen gibt es nicht (mehr)." }, 404);
   if (user.role !== "admin" && existing.created_by !== user.id) {

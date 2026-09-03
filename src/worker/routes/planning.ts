@@ -1,106 +1,226 @@
 import { Hono } from "hono";
-import type { Ingredient, PlannedDay, VoteValue } from "../../shared/types";
+import type {
+  Ingredient,
+  PlannedDay,
+  PlannedDayProposal,
+  VoteValue,
+} from "../../shared/types";
 import type { Env } from "../lib/env";
 import type { AppVariables } from "../lib/auth";
-import { currentUser, requireAuth } from "../lib/auth";
+import { currentUser, requireAuth, requireGroupId } from "../lib/auth";
 import { newId } from "../lib/ids";
 import { getSettings } from "../lib/settings";
 import { addDays, isValidIsoDate, todayInZone, votingState } from "../lib/time";
 import { ValidationError, requireString } from "../lib/validation";
 
-interface PlannedRow {
+interface PlanDayRow {
   id: string;
   date: string;
   voting_open: number;
+}
+
+interface ProposalRow {
+  id: string;
+  plan_day_id: string;
+  created_by: string | null;
+  created_at: string;
   meal_id: string;
   meal_name: string;
   meal_description: string | null;
   meal_image: string | null;
   meal_cookidoo_url: string | null;
-  yes_votes: number;
-  no_votes: number;
-  my_vote: number | null;
+  created_by_name: string | null;
+}
+
+interface VoteRow {
+  proposal_id: string;
+  user_id: string;
+  vote: number;
+}
+
+interface IngredientRow {
+  id: string;
+  meal_id: string;
+  name: string;
+  amount: number | null;
+  unit: string | null;
 }
 
 /**
- * Lädt geplante Tage inklusive Abstimmungsergebnis und Zutaten.
- * Die Deadline wird hier - und nur hier - serverseitig ausgewertet.
+ * Gewinner eines geschlossenen Tages: der Vorschlag mit der höchsten
+ * Ja-minus-Nein-Differenz. Bei Gleichstand gewinnt die höhere Zahl an
+ * Ja-Stimmen, danach der früher eingereichte Vorschlag - damit ist die
+ * Entscheidung immer eindeutig und reproduzierbar.
+ */
+function pickWinner(proposals: PlannedDayProposal[]): string | null {
+  let best: PlannedDayProposal | null = null;
+  for (const proposal of proposals) {
+    if (!best) {
+      best = proposal;
+      continue;
+    }
+    const diff = proposal.votes.yes - proposal.votes.no;
+    const bestDiff = best.votes.yes - best.votes.no;
+    if (diff > bestDiff || (diff === bestDiff && proposal.votes.yes > best.votes.yes)) {
+      best = proposal;
+    }
+  }
+  return best?.id ?? null;
+}
+
+/** Verständliche Meldung, warum eine Abstimmung geschlossen ist. */
+function closedVotingMessage(reason: "past" | "deadline" | "admin" | null): string {
+  switch (reason) {
+    case "past":
+      return "Dieser Tag liegt in der Vergangenheit. Abstimmen ist nicht mehr möglich.";
+    case "admin":
+      return "Diese Abstimmung wurde von einem Admin geschlossen.";
+    default:
+      return "Die Abstimmung für diesen Tag ist bereits geschlossen.";
+  }
+}
+
+/**
+ * Lädt geplante Tage (plan_days) einer Gruppe inklusive aller Vorschläge,
+ * Abstimmungsergebnisse und Zutaten. Die Deadline wird hier - und nur hier -
+ * serverseitig ausgewertet; der Gewinner wird für geschlossene Tage live
+ * berechnet und nie gespeichert.
  */
 export async function loadPlannedDays(
   env: Env,
-  userId: string,
+  viewer: { id: string; groupId: string },
   range: { from: string; to: string },
 ): Promise<PlannedDay[]> {
   const settings = await getSettings(env);
-  const { results } = await env.DB.prepare(
-    `SELECT md.id, md.date, md.voting_open,
+  const { results: planDays } = await env.DB.prepare(
+    "SELECT id, date, voting_open FROM plan_days WHERE group_id = ? AND date >= ? AND date <= ? ORDER BY date ASC",
+  )
+    .bind(viewer.groupId, range.from, range.to)
+    .all<PlanDayRow>();
+  if (planDays.length === 0) return [];
+
+  const dayIds = planDays.map((day) => day.id);
+  const dayPlaceholders = dayIds.map(() => "?").join(", ");
+
+  const { results: proposals } = await env.DB.prepare(
+    `SELECT mp.id, mp.plan_day_id, mp.created_by, mp.created_at,
             m.id AS meal_id, m.name AS meal_name,
             m.description AS meal_description, m.image AS meal_image,
             m.cookidoo_url AS meal_cookidoo_url,
-            COALESCE(SUM(CASE WHEN v.vote = 1 THEN 1 ELSE 0 END), 0) AS yes_votes,
-            COALESCE(SUM(CASE WHEN v.vote = -1 THEN 1 ELSE 0 END), 0) AS no_votes,
-            MAX(CASE WHEN v.user_id = ?1 THEN v.vote END) AS my_vote
-       FROM meal_days md
-       JOIN meals m ON m.id = md.meal_id
-       LEFT JOIN votes v ON v.meal_day_id = md.id
-      WHERE md.date >= ?2 AND md.date <= ?3
-      GROUP BY md.id
-      ORDER BY md.date ASC`,
+            u.name AS created_by_name
+       FROM meal_proposals mp
+       JOIN meals m ON m.id = mp.meal_id
+       LEFT JOIN users u ON u.id = mp.created_by
+      WHERE mp.plan_day_id IN (${dayPlaceholders})
+      ORDER BY mp.created_at ASC, mp.rowid ASC`,
   )
-    .bind(userId, range.from, range.to)
-    .all<PlannedRow>();
+    .bind(...dayIds)
+    .all<ProposalRow>();
 
-  if (results.length === 0) return [];
+  // Stimmen und Zutaten nur laden, wenn es überhaupt Vorschläge gibt -
+  // sonst würde "IN ()" eine leere Werteliste erzeugen.
+  const proposalsById = new Map<string, ProposalRow>();
+  const voteQueries: string[] = [];
+  const mealIds: string[] = [];
+  for (const proposal of proposals) {
+    proposalsById.set(proposal.id, proposal);
+    voteQueries.push("?");
+    if (!mealIds.includes(proposal.meal_id)) mealIds.push(proposal.meal_id);
+  }
 
-  const mealIds = [...new Set(results.map((r) => r.meal_id))];
-  const placeholders = mealIds.map(() => "?").join(", ");
-  const { results: ingredientRows } = await env.DB.prepare(
-    `SELECT id, meal_id, name, amount, unit FROM ingredients
-      WHERE meal_id IN (${placeholders}) ORDER BY position ASC, rowid ASC`,
-  )
-    .bind(...mealIds)
-    .all<{ id: string; meal_id: string; name: string; amount: number | null; unit: string | null }>();
+  const votesByProposal = new Map<string, { yes: number; no: number; myVote: VoteValue | null }>();
+  if (proposals.length > 0) {
+    const { results: votes } = await env.DB.prepare(
+      `SELECT proposal_id, user_id, vote FROM proposal_votes
+        WHERE proposal_id IN (${voteQueries.join(", ")})`,
+    )
+      .bind(...proposals.map((p) => p.id))
+      .all<VoteRow>();
+    for (const vote of votes) {
+      const entry = votesByProposal.get(vote.proposal_id) ?? { yes: 0, no: 0, myVote: null };
+      if (vote.vote === 1) entry.yes += 1;
+      else entry.no += 1;
+      if (vote.user_id === viewer.id) entry.myVote = vote.vote > 0 ? 1 : -1;
+      votesByProposal.set(vote.proposal_id, entry);
+    }
+  }
 
   const ingredientsByMeal = new Map<string, Ingredient[]>();
-  for (const row of ingredientRows) {
-    const list = ingredientsByMeal.get(row.meal_id) ?? [];
-    list.push({ id: row.id, name: row.name, amount: row.amount, unit: row.unit });
-    ingredientsByMeal.set(row.meal_id, list);
+  if (mealIds.length > 0) {
+    const placeholders = mealIds.map(() => "?").join(", ");
+    const { results: ingredientRows } = await env.DB.prepare(
+      `SELECT id, meal_id, name, amount, unit FROM ingredients
+        WHERE meal_id IN (${placeholders}) ORDER BY position ASC, rowid ASC`,
+    )
+      .bind(...mealIds)
+      .all<IngredientRow>();
+    for (const row of ingredientRows) {
+      const list = ingredientsByMeal.get(row.meal_id) ?? [];
+      list.push({ id: row.id, name: row.name, amount: row.amount, unit: row.unit });
+      ingredientsByMeal.set(row.meal_id, list);
+    }
   }
 
   const now = new Date();
   const today = todayInZone(now);
 
-  return results.map((row) => {
-    const state = votingState(row.date, row.voting_open === 1, settings.voteDeadlineHour, now);
-    const yes = Number(row.yes_votes);
-    const no = Number(row.no_votes);
-    const total = yes + no;
+  return planDays.map((day) => {
+    const state = votingState(day.date, day.voting_open === 1, settings.voteDeadlineHour, now);
+    const dayProposals: PlannedDayProposal[] = proposals
+      .filter((proposal) => proposal.plan_day_id === day.id)
+      .map((proposal) => {
+        const summary = votesByProposal.get(proposal.id) ?? {
+          yes: 0,
+          no: 0,
+          myVote: null as VoteValue | null,
+        };
+        const total = summary.yes + summary.no;
+        return {
+          id: proposal.id,
+          meal: {
+            id: proposal.meal_id,
+            name: proposal.meal_name,
+            description: proposal.meal_description,
+            image: proposal.meal_image,
+            ingredients: ingredientsByMeal.get(proposal.meal_id) ?? [],
+            cookidooUrl: proposal.meal_cookidoo_url,
+          },
+          createdBy: proposal.created_by,
+          createdByName: proposal.created_by_name,
+          createdAt: proposal.created_at,
+          votes: {
+            yes: summary.yes,
+            no: summary.no,
+            total,
+            approval: total === 0 ? 0 : Math.round((summary.yes / total) * 100),
+          },
+          myVote: summary.myVote,
+        };
+      });
+
     return {
-      id: row.id,
-      date: row.date,
-      meal: {
-        id: row.meal_id,
-        name: row.meal_name,
-        description: row.meal_description,
-        image: row.meal_image,
-        ingredients: ingredientsByMeal.get(row.meal_id) ?? [],
-        cookidooUrl: row.meal_cookidoo_url,
-      },
-      votes: {
-        yes,
-        no,
-        total,
-        approval: total === 0 ? 0 : Math.round((yes / total) * 100),
-      },
-      myVote: row.my_vote === null ? null : ((row.my_vote > 0 ? 1 : -1) as VoteValue),
+      id: day.id,
+      date: day.date,
+      proposals: dayProposals,
+      // Nur geschlossene Tage haben einen Gewinner.
+      winningProposalId: state.open ? null : pickWinner(dayProposals),
       votingOpen: state.open,
       closedReason: state.reason,
       deadline: state.deadline.toISOString(),
-      isToday: row.date === today,
-      isPast: row.date < today,
+      isToday: day.date === today,
+      isPast: day.date < today,
     };
   });
+}
+
+/** Lädt einen einzelnen Tag - praktisch für Antworten nach Schreibzugriffen. */
+async function loadDay(
+  env: Env,
+  viewer: { id: string; groupId: string },
+  date: string,
+): Promise<PlannedDay | undefined> {
+  const days = await loadPlannedDays(env, viewer, { from: date, to: date });
+  return days[0];
 }
 
 const planning = new Hono<{ Bindings: Env; Variables: AppVariables }>();
@@ -108,11 +228,13 @@ const planning = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 planning.use("*", requireAuth);
 
 /**
- * Essensplan. Standardmäßig ab heute bis `planningDaysAhead` Tage in die
- * Zukunft; mit `?from=&to=` kann ein eigener Zeitraum geladen werden.
+ * Essensplan der eigenen Gruppe. Standardmäßig ab heute bis
+ * `planningDaysAhead` Tage in die Zukunft; mit `?from=&to=` kann ein eigener
+ * Zeitraum geladen werden (z.B. für "Vergangene zeigen").
  */
 planning.get("/", async (c) => {
   const user = currentUser(c);
+  const groupId = requireGroupId(user);
   const settings = await getSettings(c.env);
   const today = todayInZone();
 
@@ -121,16 +243,19 @@ planning.get("/", async (c) => {
   const from = fromParam && isValidIsoDate(fromParam) ? fromParam : today;
   const to = toParam && isValidIsoDate(toParam) ? toParam : addDays(today, settings.planningDaysAhead);
 
-  const days = await loadPlannedDays(c.env, user.id, { from, to });
+  const days = await loadPlannedDays(c.env, { id: user.id, groupId }, { from, to });
   return c.json({ days, range: { from, to }, today });
 });
 
 /**
- * Essen einem Tag zuordnen. Pro Tag ist genau ein Essen geplant; ein erneutes
- * Zuordnen ersetzt den Eintrag.
+ * Ein Essen für einen Tag vorschlagen. Pro Tag sind beliebig viele Vorschläge
+ * erlaubt (solange die Abstimmung offen ist) - die Gruppe stimmt danach je
+ * Vorschlag ab. Dasselbe Essen kann für denselben Tag nicht doppelt
+ * vorgeschlagen werden (UNIQUE-Constraint in der DB).
  */
 planning.post("/", async (c) => {
   const user = currentUser(c);
+  const groupId = requireGroupId(user);
   const body = await c.req.json().catch(() => ({}));
 
   const date = requireString(body.date, "date", { max: 10, label: "Datum" });
@@ -147,50 +272,90 @@ planning.post("/", async (c) => {
     });
   }
 
-  const meal = await c.env.DB.prepare("SELECT id FROM meals WHERE id = ?")
-    .bind(mealId)
+  // Essen muss aus der eigenen Gruppe stammen - fremde Gruppen bleiben unsichtbar.
+  const meal = await c.env.DB.prepare("SELECT id FROM meals WHERE id = ? AND group_id = ?")
+    .bind(mealId, groupId)
     .first<{ id: string }>();
   if (!meal) {
-    throw new ValidationError("Unbekanntes Essen.", { mealId: "Bitte wähle ein vorhandenes Essen." });
+    throw new ValidationError("Unbekanntes Essen.", {
+      mealId: "Bitte wähle ein vorhandenes Essen aus deiner Gruppe.",
+    });
   }
 
-  const existing = await c.env.DB.prepare("SELECT id, meal_id FROM meal_days WHERE date = ?")
-    .bind(date)
-    .first<{ id: string; meal_id: string }>();
+  const settings = await getSettings(c.env);
+  const existingDay = await c.env.DB.prepare(
+    "SELECT id, voting_open FROM plan_days WHERE group_id = ? AND date = ?",
+  )
+    .bind(groupId, date)
+    .first<{ id: string; voting_open: number }>();
 
-  if (existing) {
-    if (existing.meal_id === mealId) {
-      return c.json({ ok: true, changed: false });
-    }
-    // Nur Admins dürfen eine bestehende Planung überschreiben - sonst
-    // könnte jemand eine laufende Abstimmung unter den Füßen wegziehen.
-    if (user.role !== "admin") {
+  let planDayId: string;
+  if (existingDay) {
+    // In einen bereits geschlossenen Tag können keine Vorschläge mehr
+    // eingebracht werden - Ausnahme: Admins dürfen vergangene Tage pflegen.
+    const state = votingState(date, existingDay.voting_open === 1, settings.voteDeadlineHour);
+    if (!state.open && !(user.role === "admin" && date < today)) {
       return c.json(
-        { error: "Für diesen Tag ist bereits ein Essen geplant. Das kann nur ein Admin ändern." },
-        403,
+        {
+          error: closedVotingMessage(state.reason),
+          closedReason: state.reason,
+          deadline: state.deadline.toISOString(),
+        },
+        409,
       );
     }
-    // Essen gewechselt -> alte Stimmen sind gegenstandslos.
-    await c.env.DB.batch([
-      c.env.DB.prepare("DELETE FROM votes WHERE meal_day_id = ?").bind(existing.id),
-      c.env.DB.prepare("UPDATE meal_days SET meal_id = ? WHERE id = ?").bind(mealId, existing.id),
-    ]);
-    return c.json({ ok: true, changed: true });
+    planDayId = existingDay.id;
+  } else {
+    planDayId = newId();
+    await c.env.DB.prepare(
+      "INSERT INTO plan_days (id, group_id, date) VALUES (?, ?, ?)",
+    )
+      .bind(planDayId, groupId, date)
+      .run();
   }
 
-  await c.env.DB.prepare("INSERT INTO meal_days (id, meal_id, date) VALUES (?, ?, ?)")
-    .bind(newId(), mealId, date)
+  const existingProposal = await c.env.DB.prepare(
+    "SELECT id FROM meal_proposals WHERE plan_day_id = ? AND meal_id = ?",
+  )
+    .bind(planDayId, mealId)
+    .first<{ id: string }>();
+  if (existingProposal) {
+    // Schon vorgeschlagen - kein Fehler, aber auch keine neue Planung.
+    return c.json({
+      ok: true,
+      changed: false,
+      day: await loadDay(c.env, { id: user.id, groupId }, date),
+    });
+  }
+
+  await c.env.DB.prepare(
+    "INSERT INTO meal_proposals (id, plan_day_id, meal_id, created_by) VALUES (?, ?, ?, ?)",
+  )
+    .bind(newId(), planDayId, mealId, user.id)
     .run();
-  return c.json({ ok: true, changed: true }, 201);
+
+  return c.json(
+    {
+      ok: true,
+      changed: true,
+      day: await loadDay(c.env, { id: user.id, groupId }, date),
+    },
+    201,
+  );
 });
 
+/**
+ * Einen geplanten Tag (mit allen Vorschlägen) entfernen. Nur Admins - die
+ * Löschung räumt per ON DELETE CASCADE auch Vorschläge und Stimmen auf.
+ */
 planning.delete("/:id", async (c) => {
   const user = currentUser(c);
   if (user.role !== "admin") {
     return c.json({ error: "Nur Admins können den Essensplan ändern." }, 403);
   }
-  const result = await c.env.DB.prepare("DELETE FROM meal_days WHERE id = ?")
-    .bind(c.req.param("id"))
+  const groupId = requireGroupId(user);
+  const result = await c.env.DB.prepare("DELETE FROM plan_days WHERE id = ? AND group_id = ?")
+    .bind(c.req.param("id"), groupId)
     .run();
   if (!result.meta.changes) return c.json({ error: "Diese Planung gibt es nicht (mehr)." }, 404);
   return c.json({ ok: true });

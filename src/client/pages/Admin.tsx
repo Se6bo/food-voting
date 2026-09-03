@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
-import type { AppSettings, Meal, Role } from "../../shared/types";
+import type { AdminGroup, AppSettings, Meal, Role } from "../../shared/types";
 import { ApiRequestError, api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { formatDateOnly, formatDateTime, formatTimestampShort } from "../lib/format";
@@ -17,15 +18,24 @@ interface AdminUser {
   voteCount: number;
 }
 
+interface PollProposal {
+  id: string;
+  mealName: string;
+  createdByName: string | null;
+  createdAt: string;
+  votes: { yes: number; no: number; total: number; approval: number };
+}
+
 interface Poll {
   id: string;
   date: string;
-  mealName: string;
+  groupName: string;
   adminOpen: boolean;
   open: boolean;
   closedReason: "past" | "deadline" | "admin" | null;
   deadline: string;
-  votes: { yes: number; no: number; total: number; approval: number };
+  proposals: PollProposal[];
+  winnerProposalId: string | null;
 }
 
 interface Stats {
@@ -36,11 +46,12 @@ interface Stats {
   shoppingItems: number;
 }
 
-type Tab = "overview" | "users" | "meals" | "polls" | "settings";
+type Tab = "overview" | "users" | "groups" | "meals" | "polls" | "settings";
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: "overview", label: "Überblick" },
   { id: "users", label: "Benutzer" },
+  { id: "groups", label: "Gruppen" },
   { id: "meals", label: "Essen" },
   { id: "polls", label: "Abstimmungen" },
   { id: "settings", label: "Einstellungen" },
@@ -207,6 +218,163 @@ function UsersTab() {
   );
 }
 
+function GroupsTab() {
+  const toast = useToast();
+  const [groups, setGroups] = useState<AdminGroup[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [fields, setFields] = useState<Record<string, string>>({});
+  const [creating, setCreating] = useState(false);
+  const [deleting, setDeleting] = useState<AdminGroup | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const data = await api.get<{ groups: AdminGroup[] }>("/admin/groups");
+      setGroups(data.groups);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : "Die Gruppen konnten nicht geladen werden.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function copyInvite(group: AdminGroup) {
+    try {
+      await navigator.clipboard.writeText(group.inviteUrl);
+      toast.success("Einladungslink kopiert.");
+    } catch {
+      toast.error("Der Link konnte nicht kopiert werden.");
+    }
+  }
+
+  async function createGroup(event: FormEvent) {
+    event.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setFields({ name: "Bitte gib einen Namen für die Gruppe ein." });
+      return;
+    }
+    setCreating(true);
+    setFields({});
+    try {
+      await api.post("/admin/groups", { name: trimmed });
+      setName("");
+      toast.success(`Gruppe "${trimmed}" wurde angelegt.`);
+      // Liste neu laden, damit die neue Gruppe samt Einladungslink erscheint.
+      await load();
+    } catch (err) {
+      if (err instanceof ApiRequestError) {
+        setFields(err.fields);
+        if (Object.keys(err.fields).length === 0) toast.error(err.message);
+      } else {
+        toast.error("Die Gruppe konnte nicht angelegt werden.");
+      }
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleting) return;
+    setBusy(true);
+    try {
+      await api.delete(`/admin/groups/${deleting.id}`);
+      setGroups((prev) => prev.filter((group) => group.id !== deleting.id));
+      toast.success(`Gruppe "${deleting.name}" wurde gelöscht.`);
+      setDeleting(null);
+    } catch (err) {
+      // z.B. 409, falls sich inzwischen doch jemand der Gruppe angeschlossen hat.
+      toast.error(err instanceof ApiRequestError ? err.message : "Die Gruppe konnte nicht gelöscht werden.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (loading) return <PageLoader label="Gruppen werden geladen ..." />;
+
+  return (
+    <div className="space-y-4">
+      {error && <Alert kind="error">{error}</Alert>}
+
+      <form onSubmit={createGroup} className="card max-w-xl space-y-4 p-5 sm:p-6">
+        <h2 className="text-base font-semibold">Neue Gruppe anlegen</h2>
+        <div>
+          <label className="label" htmlFor="group-name">
+            Name
+          </label>
+          <input
+            id="group-name"
+            className="input"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="z.B. Familie Mustermann"
+          />
+          {fields.name && <p className="field-error">{fields.name}</p>}
+        </div>
+        <div className="flex justify-end">
+          <Button type="submit" loading={creating}>
+            Gruppe anlegen
+          </Button>
+        </div>
+      </form>
+
+      {groups.length === 0 ? (
+        <EmptyState icon="👥" title="Noch keine Gruppen angelegt" />
+      ) : (
+        <div className="card divide-y divide-slate-100 dark:divide-slate-800">
+          {groups.map((group) => (
+            <div key={group.id} className="flex flex-wrap items-center gap-x-4 gap-y-3 px-5 py-4">
+              <div className="min-w-0 flex-1 basis-48">
+                <p className="font-medium">{group.name}</p>
+                <p className="text-sm muted">
+                  {group.memberCount} {group.memberCount === 1 ? "Mitglied" : "Mitglieder"} · seit{" "}
+                  {formatTimestampShort(group.createdAt)}
+                </p>
+              </div>
+              <div className="flex min-w-0 flex-1 basis-64 items-center gap-2">
+                <code
+                  title={group.inviteUrl}
+                  className="min-w-0 flex-1 truncate rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 shadow-sm dark:border-slate-700 dark:bg-[#1a222c] dark:text-slate-100"
+                >
+                  {group.inviteUrl}
+                </code>
+                <Button variant="secondary" onClick={() => copyInvite(group)}>
+                  Kopieren
+                </Button>
+              </div>
+              <Button
+                variant="ghost"
+                className="text-red-600 dark:text-red-400"
+                onClick={() => setDeleting(group)}
+                disabled={group.memberCount > 0}
+                title={group.memberCount > 0 ? "Nur Gruppen ohne Mitglieder können gelöscht werden." : undefined}
+              >
+                Löschen
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={deleting !== null}
+        title="Gruppe löschen"
+        message={`Soll die Gruppe "${deleting?.name}" wirklich gelöscht werden?`}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleting(null)}
+        busy={busy}
+      />
+    </div>
+  );
+}
+
 function MealsTab() {
   const toast = useToast();
   const [meals, setMeals] = useState<Meal[]>([]);
@@ -279,29 +447,37 @@ function PollsTab() {
   const toast = useToast();
   const [polls, setPolls] = useState<Poll[]>([]);
   const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const data = await api.get<{ polls: Poll[] }>("/admin/votes");
+      setPolls(data.polls);
+    } catch (err) {
+      toast.error(
+        err instanceof ApiRequestError ? err.message : "Die Abstimmungen konnten nicht geladen werden.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
 
   useEffect(() => {
-    api
-      .get<{ polls: Poll[] }>("/admin/votes")
-      .then((data) => setPolls(data.polls))
-      .catch(() => toast.error("Die Abstimmungen konnten nicht geladen werden."))
-      .finally(() => setLoading(false));
-  }, [toast]);
+    void load();
+  }, [load]);
 
   async function toggleOpen(poll: Poll) {
     const next = !poll.adminOpen;
+    setBusyId(poll.id);
     try {
       await api.put(`/admin/votes/${poll.id}`, { open: next });
-      setPolls((prev) =>
-        prev.map((p) =>
-          p.id === poll.id
-            ? { ...p, adminOpen: next, open: next && p.closedReason !== "past" && new Date(p.deadline) > new Date() }
-            : p,
-        ),
-      );
       toast.success(next ? "Abstimmung wurde geöffnet." : "Abstimmung wurde geschlossen.");
+      // Frisch laden - offen/geschlossen samt Grund berechnet der Server.
+      await load();
     } catch (err) {
       toast.error(err instanceof ApiRequestError ? err.message : "Die Änderung war nicht möglich.");
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -311,27 +487,65 @@ function PollsTab() {
   return (
     <div className="space-y-3">
       {polls.map((poll) => (
-        <div key={poll.id} className="card flex flex-wrap items-center justify-between gap-4 p-5">
-          <div className="min-w-0">
-            <p className="font-medium">
-              {formatDateOnly(poll.date)} · {poll.mealName}
-            </p>
-            <p className="mt-1 text-sm muted">
-              👍 {poll.votes.yes} · 👎 {poll.votes.no} · {poll.votes.approval}% Zustimmung
-            </p>
-            <p className="mt-0.5 text-xs muted">
-              {poll.open
-                ? `Offen bis ${formatDateTime(poll.deadline)} Uhr`
-                : poll.closedReason === "past"
-                  ? "Tag ist vorbei"
-                  : poll.closedReason === "admin"
-                    ? "Von einem Admin geschlossen"
-                    : "Deadline abgelaufen"}
-            </p>
+        <div key={poll.id} className="card p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-medium">
+                {formatDateOnly(poll.date)} · {poll.groupName}
+              </p>
+              <p className="mt-0.5 text-xs muted">
+                {poll.open
+                  ? `Offen bis ${formatDateTime(poll.deadline)} Uhr`
+                  : poll.closedReason === "past"
+                    ? "Tag ist vorbei"
+                    : poll.closedReason === "admin"
+                      ? "Von einem Admin geschlossen"
+                      : "Deadline abgelaufen"}
+              </p>
+            </div>
+            <Button
+              variant="secondary"
+              onClick={() => toggleOpen(poll)}
+              loading={busyId === poll.id}
+              disabled={busyId !== null}
+            >
+              {poll.adminOpen ? "Schließen" : "Öffnen"}
+            </Button>
           </div>
-          <Button variant="secondary" onClick={() => toggleOpen(poll)}>
-            {poll.adminOpen ? "Schließen" : "Öffnen"}
-          </Button>
+
+          {poll.proposals.length === 0 ? (
+            <p className="mt-3 rounded-xl bg-slate-50 px-3.5 py-3 text-sm muted dark:bg-slate-800/50">
+              Noch keine Vorschläge für diesen Tag.
+            </p>
+          ) : (
+            <ul className="mt-3 divide-y divide-slate-100 dark:divide-slate-800">
+              {poll.proposals.map((proposal) => {
+                const isWinner = !poll.open && poll.winnerProposalId === proposal.id;
+                return (
+                  <li
+                    key={proposal.id}
+                    className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2.5"
+                  >
+                    <span className="min-w-0">
+                      <span className="text-sm font-medium">{proposal.mealName}</span>
+                      {isWinner && (
+                        <span className="badge ml-2 bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                          <span aria-hidden="true">🏆</span> Gewinner
+                        </span>
+                      )}
+                      <span className="block text-xs muted">
+                        Von {proposal.createdByName ?? "Unbekannt"}
+                      </span>
+                    </span>
+                    <span className="text-sm tabular-nums muted">
+                      👍 {proposal.votes.yes} · 👎 {proposal.votes.no} · {proposal.votes.approval}%
+                      Zustimmung
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       ))}
     </div>
@@ -486,7 +700,7 @@ export function AdminPage() {
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Admin-Bereich</h1>
-        <p className="mt-1 text-sm muted">Benutzer, Essen, Abstimmungen und Systemeinstellungen.</p>
+        <p className="mt-1 text-sm muted">Benutzer, Gruppen, Essen, Abstimmungen und Systemeinstellungen.</p>
       </header>
 
       <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
@@ -517,6 +731,7 @@ export function AdminPage() {
       <div role="tabpanel">
         {tab === "overview" && <OverviewTab />}
         {tab === "users" && <UsersTab />}
+        {tab === "groups" && <GroupsTab />}
         {tab === "meals" && <MealsTab />}
         {tab === "polls" && <PollsTab />}
         {tab === "settings" && <SettingsTab />}

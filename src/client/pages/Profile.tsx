@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import type { PublicUser } from "../../shared/types";
+import type { MyGroup, PublicUser } from "../../shared/types";
 import { ApiRequestError, api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { formatDateOnly, formatTimestampShort } from "../lib/format";
@@ -28,6 +28,8 @@ export function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [votes, setVotes] = useState<MyVote[]>([]);
+  const [group, setGroup] = useState<MyGroup | null>(null);
+  const [groupError, setGroupError] = useState<string | null>(null);
 
   useEffect(() => {
     api
@@ -35,6 +37,20 @@ export function ProfilePage() {
       .then((data) => setVotes(data.votes))
       .catch(() => {
         // Die Stimmenhistorie ist nur ein Extra - kein Grund für eine Fehlermeldung.
+      });
+  }, []);
+
+  // Die Profilseite ist nur für angemeldete Benutzer erreichbar (RequireAuth).
+  useEffect(() => {
+    api
+      .get<{ group: MyGroup }>("/groups/me")
+      .then((data) => setGroup(data.group))
+      .catch((err: unknown) => {
+        setGroupError(
+          err instanceof ApiRequestError
+            ? err.message
+            : "Deine Gruppe konnte nicht geladen werden.",
+        );
       });
   }, []);
 
@@ -65,6 +81,16 @@ export function ProfilePage() {
     }
   }
 
+  async function handleCopyInvite() {
+    if (!group) return;
+    try {
+      await navigator.clipboard.writeText(group.inviteUrl);
+      toast.success("Link kopiert.");
+    } catch {
+      toast.error("Der Link konnte nicht kopiert werden.");
+    }
+  }
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <header>
@@ -91,6 +117,51 @@ export function ProfilePage() {
             </dd>
           </div>
         </dl>
+      </section>
+
+      <section className="card space-y-5 p-5 sm:p-6">
+        <h2 className="section-title">Meine Gruppe</h2>
+
+        {groupError && <Alert kind="error">{groupError}</Alert>}
+        {!group && !groupError && <p className="text-sm muted">Gruppe wird geladen ...</p>}
+
+        {group && (
+          <>
+            <dl className="grid gap-4">
+              <div>
+                <dt className="text-xs uppercase tracking-wide muted">Gruppenname</dt>
+                <dd className="mt-1 text-sm font-medium">{group.name}</dd>
+              </div>
+            </dl>
+
+            <div>
+              <p className="label">Einladungslink</p>
+              <div className="flex items-center gap-2">
+                <code
+                  title={group.inviteUrl}
+                  className="min-w-0 flex-1 truncate rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm dark:border-slate-700 dark:bg-[#1a222c] dark:text-slate-100"
+                >
+                  {group.inviteUrl}
+                </code>
+                <Button variant="secondary" onClick={handleCopyInvite}>
+                  Kopieren
+                </Button>
+              </div>
+            </div>
+
+            <div>
+              <p className="label">Mitglieder</p>
+              <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+                {group.members.map((member) => (
+                  <li key={member.id} className="px-3.5 py-2.5">
+                    <p className="truncate text-sm font-medium">{member.name}</p>
+                    <p className="truncate text-xs muted">{member.email}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </>
+        )}
       </section>
 
       <section className="card p-5 sm:p-6">

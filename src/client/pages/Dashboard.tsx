@@ -44,7 +44,11 @@ export function DashboardPage() {
   if (loading) return <PageLoader label="Essensplan wird geladen ..." />;
 
   const upcoming = days.filter((day) => !day.isPast);
-  const openVotes = upcoming.filter((day) => day.votingOpen && day.myVote === null).length;
+  // Offene Tage zählen, an denen es mindestens einen Vorschlag gibt, bei dem
+  // der Benutzer noch nicht abgestimmt hat.
+  const openVotes = upcoming.filter(
+    (day) => day.votingOpen && day.proposals.some((proposal) => proposal.myVote === null),
+  ).length;
 
   return (
     <div className="space-y-6">

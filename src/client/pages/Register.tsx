@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { ApiRequestError } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useToast } from "../lib/toast";
@@ -10,13 +10,16 @@ export function RegisterPage() {
   const { user, loading, register, appName } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
+  // Einladungscode aus der URL (?einladung=...) vorbelegen, z. B. vom
+  // Gruppen-Einladungslink in src/worker/routes/groups.ts.
+  const [searchParams] = useSearchParams();
 
   const [form, setForm] = useState({
     name: "",
     email: "",
     password: "",
     passwordConfirm: "",
-    inviteCode: "",
+    groupInviteCode: searchParams.get("einladung") ?? "",
   });
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -53,7 +56,7 @@ export function RegisterPage() {
         email: form.email,
         password: form.password,
         passwordConfirm: form.passwordConfirm,
-        inviteCode: form.inviteCode || undefined,
+        groupInviteCode: form.groupInviteCode || undefined,
       });
       toast.success("Konto erstellt. Willkommen!");
       navigate("/", { replace: true });
@@ -150,18 +153,22 @@ export function RegisterPage() {
               {fields.passwordConfirm && <p className="field-error">{fields.passwordConfirm}</p>}
             </div>
 
-            {/* Nur relevant, wenn ein Einladungscode konfiguriert ist. */}
+            {/* Optional - mit Code tritt man einer bestehenden Gruppe bei. */}
             <div>
-              <label className="label" htmlFor="inviteCode">
-                Einladungscode <span className="font-normal muted">(falls vorhanden)</span>
+              <label className="label" htmlFor="groupInviteCode">
+                Einladungscode <span className="font-normal muted">(optional)</span>
               </label>
               <input
-                id="inviteCode"
+                id="groupInviteCode"
                 className="input"
-                value={form.inviteCode}
-                onChange={(e) => update("inviteCode", e.target.value)}
+                value={form.groupInviteCode}
+                onChange={(e) => update("groupInviteCode", e.target.value)}
               />
-              {fields.inviteCode && <p className="field-error">{fields.inviteCode}</p>}
+              <p className="mt-1 text-xs muted">
+                Falls du einer bestehenden Gruppe beitreten möchtest. Ohne Code bekommst du automatisch eine eigene
+                neue Gruppe.
+              </p>
+              {fields.groupInviteCode && <p className="field-error">{fields.groupInviteCode}</p>}
             </div>
 
             <Button type="submit" loading={submitting} className="w-full">
