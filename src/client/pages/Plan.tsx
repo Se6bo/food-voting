@@ -92,6 +92,15 @@ export function PlanPage() {
         </div>
       </header>
 
+      <PlanMealDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        onSaved={load}
+        defaultDate={today}
+        plannedSlots={plannedSlots}
+        variant="inline"
+      />
+
       {error && <Alert kind="error">{error}</Alert>}
 
       {days.length === 0 ? (
@@ -147,14 +156,6 @@ export function PlanPage() {
           })}
         </div>
       )}
-
-      <PlanMealDialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        onSaved={load}
-        defaultDate={today}
-        plannedSlots={plannedSlots}
-      />
     </div>
   );
 }

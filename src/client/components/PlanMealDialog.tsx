@@ -24,6 +24,7 @@ export function PlanMealDialog({
   defaultSlot = "lunch",
   fixedMeal = null,
   plannedSlots,
+  variant = "modal",
 }: {
   open: boolean;
   onClose: () => void;
@@ -34,6 +35,11 @@ export function PlanMealDialog({
   fixedMeal?: { id: string; name: string } | null;
   /** Schlüssel `date|slot` mit vorhandenen Vorschlägen, für die Hinweis-Meldung. */
   plannedSlots?: Set<string>;
+  /**
+   * 'inline' zeigt den Inhalt direkt im Seitenfluss statt als Overlay -
+   * für Umgebungen wie eine WebView-APK, in der Fixed-Overlays nicht funktionieren.
+   */
+  variant?: "modal" | "inline";
 }) {
   const toast = useToast();
   const [meals, setMeals] = useState<Meal[]>([]);
@@ -100,125 +106,152 @@ export function PlanMealDialog({
 
   const alreadyPlanned = plannedSlots?.has(`${date}|${slot}`) ?? false;
 
-  return (
-    <Modal
-      open={open}
-      title="Essen einplanen"
-      onClose={onClose}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose} disabled={saving}>
-            Abbrechen
-          </Button>
-          <Button onClick={handleSave} loading={saving}>
-            Einplanen
-          </Button>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        {error && <Alert kind="error">{error}</Alert>}
+  if (!open) return null;
 
-        {fixedMeal && (
-          <div className="rounded-xl bg-slate-50 px-3.5 py-2.5 text-sm font-medium dark:bg-slate-800/50">
-            {fixedMeal.name}
-          </div>
+  const footer = (
+    <>
+      <Button variant="secondary" onClick={onClose} disabled={saving}>
+        Abbrechen
+      </Button>
+      <Button onClick={handleSave} loading={saving}>
+        Einplanen
+      </Button>
+    </>
+  );
+
+  const body = (
+    <div className="space-y-4">
+      {error && <Alert kind="error">{error}</Alert>}
+
+      {fixedMeal && (
+        <div className="rounded-xl bg-slate-50 px-3.5 py-2.5 text-sm font-medium dark:bg-slate-800/50">
+          {fixedMeal.name}
+        </div>
+      )}
+
+      <div>
+        <label className="label" htmlFor="assign-date">
+          Tag
+        </label>
+        <input
+          id="assign-date"
+          type="date"
+          className="input"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+        />
+      </div>
+
+      <div>
+        <span className="label">Mahlzeit</span>
+        <div className="flex flex-wrap gap-2">
+          {MEAL_SLOTS.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setSlot(s)}
+              aria-pressed={slot === s}
+              className={[
+                "btn min-h-[44px] flex-1 whitespace-nowrap border px-3",
+                slot === s
+                  ? "border-brand-600 bg-brand-600 text-white hover:bg-brand-700 dark:border-brand-500 dark:bg-brand-500 dark:text-slate-950"
+                  : "border-slate-300 bg-white text-slate-700 hover:border-brand-400 hover:bg-brand-50 dark:border-slate-700 dark:bg-[#1a222c] dark:text-slate-200 dark:hover:bg-slate-800",
+              ].join(" ")}
+            >
+              {mealSlotLabel(s)}
+            </button>
+          ))}
+        </div>
+        {alreadyPlanned && (
+          <p className="mt-1.5 text-sm text-amber-600 dark:text-amber-400">
+            Für {mealSlotLabel(slot)} an diesem Tag gibt es bereits Vorschläge. Weitere sind
+            erlaubt, solange die Abstimmung läuft.
+          </p>
         )}
+      </div>
 
+      {!fixedMeal && (
         <div>
-          <label className="label" htmlFor="assign-date">
-            Tag
-          </label>
-          <input
-            id="assign-date"
-            type="date"
-            className="input"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </div>
-
-        <div>
-          <span className="label">Mahlzeit</span>
-          <div className="flex flex-wrap gap-2">
-            {MEAL_SLOTS.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setSlot(s)}
-                aria-pressed={slot === s}
-                className={[
-                  "btn min-h-[44px] flex-1 whitespace-nowrap border px-3",
-                  slot === s
-                    ? "border-brand-600 bg-brand-600 text-white hover:bg-brand-700 dark:border-brand-500 dark:bg-brand-500 dark:text-slate-950"
-                    : "border-slate-300 bg-white text-slate-700 hover:border-brand-400 hover:bg-brand-50 dark:border-slate-700 dark:bg-[#1a222c] dark:text-slate-200 dark:hover:bg-slate-800",
-                ].join(" ")}
-              >
-                {mealSlotLabel(s)}
-              </button>
-            ))}
-          </div>
-          {alreadyPlanned && (
-            <p className="mt-1.5 text-sm text-amber-600 dark:text-amber-400">
-              Für {mealSlotLabel(slot)} an diesem Tag gibt es bereits Vorschläge. Weitere sind
-              erlaubt, solange die Abstimmung läuft.
-            </p>
-          )}
-        </div>
-
-        {!fixedMeal && (
-          <div>
-            {categories.length > 0 && (
-              <div className="mb-2">
-                <label className="label" htmlFor="assign-category">
-                  Kategorie <span className="font-normal muted">(zum Filtern)</span>
-                </label>
-                <select
-                  id="assign-category"
-                  className="input"
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
-                >
-                  <option value="">Alle Kategorien</option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            <label className="label" htmlFor="assign-meal">
-              Essen
-            </label>
-            {meals.length === 0 ? (
-              <p className="text-sm muted">
-                Es gibt noch keine Essen.{" "}
-                <Link to="/essen/neu" className="text-brand-600 hover:underline dark:text-brand-400">
-                  Jetzt eines anlegen
-                </Link>
-                .
-              </p>
-            ) : filteredMeals.length === 0 ? (
-              <p className="text-sm muted">Kein Essen in dieser Kategorie.</p>
-            ) : (
+          {categories.length > 0 && (
+            <div className="mb-2">
+              <label className="label" htmlFor="assign-category">
+                Kategorie <span className="font-normal muted">(zum Filtern)</span>
+              </label>
               <select
-                id="assign-meal"
+                id="assign-category"
                 className="input"
-                value={mealId}
-                onChange={(e) => setMealId(e.target.value)}
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
               >
-                {filteredMeals.map((meal) => (
-                  <option key={meal.id} value={meal.id}>
-                    {meal.name}
+                <option value="">Alle Kategorien</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
                   </option>
                 ))}
               </select>
-            )}
-          </div>
-        )}
+            </div>
+          )}
+
+          <label className="label" htmlFor="assign-meal">
+            Essen
+          </label>
+          {meals.length === 0 ? (
+            <p className="text-sm muted">
+              Es gibt noch keine Essen.{" "}
+              <Link to="/essen/neu" className="text-brand-600 hover:underline dark:text-brand-400">
+                Jetzt eines anlegen
+              </Link>
+              .
+            </p>
+          ) : filteredMeals.length === 0 ? (
+            <p className="text-sm muted">Kein Essen in dieser Kategorie.</p>
+          ) : (
+            <select
+              id="assign-meal"
+              className="input"
+              value={mealId}
+              onChange={(e) => setMealId(e.target.value)}
+            >
+              {filteredMeals.map((meal) => (
+                <option key={meal.id} value={meal.id}>
+                  {meal.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  if (variant === "inline") {
+    return (
+      <div className="card space-y-4 p-5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold">Essen einplanen</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Schließen"
+            className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+          >
+            <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+            </svg>
+          </button>
+        </div>
+        {body}
+        <div className="flex flex-col-reverse gap-2 border-t border-slate-200 pt-4 sm:flex-row sm:justify-end dark:border-slate-800">
+          {footer}
+        </div>
       </div>
+    );
+  }
+
+  return (
+    <Modal open={open} title="Essen einplanen" onClose={onClose} footer={footer}>
+      {body}
     </Modal>
   );
 }
