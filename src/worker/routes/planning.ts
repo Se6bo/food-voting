@@ -380,6 +380,68 @@ planning.post("/", async (c) => {
 });
 
 /**
+ * Einen einzelnen Essen-Vorschlag entfernen - nur solange die Abstimmung des
+ * Tages offen ist. Eigene Vorschläge darf jedes Mitglied entfernen, fremde
+ * nur Admins der eigenen Gruppe. Die Stimmen zu diesem Vorschlag räumt das
+ * bestehende ON DELETE CASCADE von proposal_votes.proposal_id auf
+ * (Migration 0003) - kein manuelles Löschen nötig.
+ */
+planning.delete("/proposals/:proposalId", async (c) => {
+  const user = currentUser(c);
+  const groupId = requireGroupId(user);
+  const proposalId = c.req.param("proposalId");
+
+  // Gruppen-Check direkt in der Query: Ein Vorschlag aus einer fremden Gruppe
+  // existiert für diesen Benutzer schlicht nicht (404, kein Datenleck).
+  const proposal = await c.env.DB.prepare(
+    `SELECT mp.id, mp.created_by, pd.date, pd.slot, pd.voting_open
+       FROM meal_proposals mp
+       JOIN plan_days pd ON pd.id = mp.plan_day_id
+      WHERE mp.id = ? AND pd.group_id = ?`,
+  )
+    .bind(proposalId, groupId)
+    .first<{
+      id: string;
+      created_by: string | null;
+      date: string;
+      slot: string;
+      voting_open: number;
+    }>();
+  if (!proposal) {
+    return c.json({ error: "Dieser Vorschlag existiert nicht (mehr)." }, 404);
+  }
+
+  // Entfernen ist nur bei offener Abstimmung möglich - egal welche Rolle.
+  // Geschlossene Tage (past/deadline/admin) geben 409 mit demselben Muster
+  // wie beim Vorschlagen; Admins können den Tag dafür über /:id entfernen
+  // bzw. die Abstimmung wieder öffnen.
+  const settings = await getSettings(c.env);
+  const state = votingState(proposal.date, proposal.voting_open === 1, settings.voteDeadlineHour);
+  if (!state.open) {
+    return c.json(
+      {
+        error: closedVotingMessage(state.reason),
+        closedReason: state.reason,
+        deadline: state.deadline.toISOString(),
+      },
+      409,
+    );
+  }
+
+  // Berechtigung: eigene Vorschläge für alle, fremde nur für Admins.
+  if (proposal.created_by !== user.id && user.role !== "admin") {
+    return c.json({ error: "Du kannst nur deine eigenen Vorschläge entfernen." }, 403);
+  }
+
+  await c.env.DB.prepare("DELETE FROM meal_proposals WHERE id = ?").bind(proposal.id).run();
+
+  return c.json({
+    ok: true,
+    day: await loadDay(c.env, { id: user.id, groupId }, proposal.date, proposal.slot as MealSlot),
+  });
+});
+
+/**
  * Einen geplanten Tag (mit allen Vorschlägen) entfernen. Nur Admins - die
  * Löschung räumt per ON DELETE CASCADE auch Vorschläge und Stimmen auf.
  */

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { PlannedDay, PlannedDayProposal, VoteValue } from "../../shared/types";
 import { ApiRequestError, api } from "../lib/api";
+import { useAuth } from "../lib/auth";
 import {
   formatAmount,
   formatDateTime,
@@ -42,6 +43,7 @@ export function PlannedDayCard({
   showIngredients = false,
   showDate = true,
   manageVoting = true,
+  allowRemoveProposals = false,
 }: {
   day: PlannedDay;
   today: string;
@@ -51,8 +53,11 @@ export function PlannedDayCard({
   showDate?: boolean;
   /** Blendet die Öffnen/Schließen-Steuerung der Abstimmung aus (z.B. im Dashboard). */
   manageVoting?: boolean;
+  /** Zeigt pro Vorschlag einen Entfernen-Knopf für eigene Vorschläge (Admin: alle) – nur Essensplan-Seite. */
+  allowRemoveProposals?: boolean;
 }) {
   const toast = useToast();
+  const { user } = useAuth();
   /** Laufende Abstimmungs-Anfrage ("clear" = eigene Stimme zurücknehmen). */
   const [pending, setPending] = useState<{ proposalId: string; action: VoteValue | "clear" } | null>(null);
   /** Aufgeklappte Zutatenlisten je Vorschlag. */
@@ -61,9 +66,13 @@ export function PlannedDayCard({
   const [confirmClose, setConfirmClose] = useState(false);
   /** Laufende Öffnen/Schließen-Anfrage - getrennt vom Abstimmen-Pending. */
   const [votingBusy, setVotingBusy] = useState(false);
+  /** Vorschlag, der gerade im Bestätigungsdialog zum Entfernen steht. */
+  const [removeTarget, setRemoveTarget] = useState<PlannedDayProposal | null>(null);
+  /** Laufende Entfernen-Anfrage. */
+  const [removeBusy, setRemoveBusy] = useState(false);
 
   async function vote(proposal: PlannedDayProposal, value: VoteValue) {
-    if (pending) return;
+    if (pending || removeBusy) return;
     // Gleiche Reaktion nochmal tippen = eigene Stimme zurücknehmen.
     const clearing = proposal.myVote === value;
     setPending({ proposalId: proposal.id, action: clearing ? "clear" : value });
@@ -94,7 +103,7 @@ export function PlannedDayCard({
    * darf das, nicht nur Admins (siehe /api/planning/:id/voting).
    */
   async function setVotingOpen(open: boolean) {
-    if (votingBusy) return;
+    if (votingBusy || removeBusy) return;
     setVotingBusy(true);
     try {
       const result = await api.put<{ day: PlannedDay }>(`/planning/${day.id}/voting`, { open });
@@ -106,6 +115,28 @@ export function PlannedDayCard({
       );
     } finally {
       setVotingBusy(false);
+    }
+  }
+
+  /**
+   * Einen einzelnen Vorschlag entfernen - nur bei offener Abstimmung möglich
+   * (der Server prüft das zusätzlich). Stimmen zu diesem Vorschlag löscht der
+   * Server per FK-Cascade gleich mit.
+   */
+  async function removeProposal(target: PlannedDayProposal) {
+    if (removeBusy) return;
+    setRemoveBusy(true);
+    try {
+      const result = await api.delete<{ day: PlannedDay }>(`/planning/proposals/${target.id}`);
+      onChange(result.day);
+      toast.success("Der Vorschlag wurde entfernt.");
+    } catch (err) {
+      toast.error(
+        err instanceof ApiRequestError ? err.message : "Der Vorschlag konnte nicht entfernt werden.",
+      );
+    } finally {
+      setRemoveBusy(false);
+      setRemoveTarget(null);
     }
   }
 
@@ -191,9 +222,26 @@ export function PlannedDayCard({
                         </span>
                       )}
                     </div>
-                    <p className="mt-0.5 text-xs muted">
-                      Von {proposal.createdByName ?? "Unbekannt"}
-                    </p>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <p className="text-xs muted">
+                        Von {proposal.createdByName ?? "Unbekannt"}
+                      </p>
+                      {day.votingOpen &&
+                        allowRemoveProposals &&
+                        user &&
+                        (user.role === "admin" || proposal.createdBy === user.id) && (
+                          <button
+                            type="button"
+                            onClick={() => setRemoveTarget(proposal)}
+                            disabled={removeBusy || pending !== null || votingBusy}
+                            aria-label="Vorschlag entfernen"
+                            title="Vorschlag entfernen"
+                            className="text-sm font-medium text-red-600 hover:underline disabled:opacity-50 dark:text-red-400"
+                          >
+                            Entfernen
+                          </button>
+                        )}
+                    </div>
 
                     {showIngredients && ingredients.length > 0 && (
                       <div className="mt-3">
@@ -230,7 +278,7 @@ export function PlannedDayCard({
                           <button
                             type="button"
                             onClick={() => vote(proposal, 1)}
-                            disabled={pending !== null || votingBusy}
+                            disabled={pending !== null || votingBusy || removeBusy}
                             aria-pressed={proposal.myVote === 1}
                             aria-label={`Dafür stimmen – ${proposal.votes.yes} ${
                               proposal.votes.yes === 1 ? "Ja-Stimme" : "Ja-Stimmen"
@@ -251,7 +299,7 @@ export function PlannedDayCard({
                           <button
                             type="button"
                             onClick={() => vote(proposal, -1)}
-                            disabled={pending !== null || votingBusy}
+                            disabled={pending !== null || votingBusy || removeBusy}
                             aria-pressed={proposal.myVote === -1}
                             aria-label={`Dagegen stimmen – ${proposal.votes.no} ${
                               proposal.votes.no === 1 ? "Nein-Stimme" : "Nein-Stimmen"
@@ -306,7 +354,7 @@ export function PlannedDayCard({
                   variant="ghost"
                   className="mt-2 min-h-[44px]"
                   onClick={() => setConfirmClose(true)}
-                  disabled={pending !== null || votingBusy}
+                  disabled={pending !== null || votingBusy || removeBusy}
                 >
                   Abstimmung jetzt beenden
                 </Button>
@@ -324,7 +372,7 @@ export function PlannedDayCard({
                   className="min-h-[44px]"
                   onClick={() => setVotingOpen(true)}
                   loading={votingBusy}
-                  disabled={pending !== null || votingBusy}
+                  disabled={pending !== null || votingBusy || removeBusy}
                 >
                   Abstimmung wieder öffnen
                 </Button>
@@ -345,6 +393,22 @@ export function PlannedDayCard({
         }}
         onCancel={() => setConfirmClose(false)}
         busy={votingBusy}
+      />
+
+      <ConfirmDialog
+        open={removeTarget !== null}
+        title="Vorschlag entfernen?"
+        message={
+          removeTarget
+            ? `Soll „${removeTarget.meal.name}“ vom ${formatDay(day.date)} wirklich entfernt werden? Dabei werden auch alle Stimmen zu diesem Vorschlag gelöscht.`
+            : ""
+        }
+        confirmLabel="Entfernen"
+        onConfirm={async () => {
+          if (removeTarget) await removeProposal(removeTarget);
+        }}
+        onCancel={() => setRemoveTarget(null)}
+        busy={removeBusy}
       />
     </article>
   );

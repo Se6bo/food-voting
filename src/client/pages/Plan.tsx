@@ -124,6 +124,7 @@ export function PlanPage() {
                         onChange={handleDayChange}
                         showIngredients
                         showDate={false}
+                        allowRemoveProposals
                       />
                       {isAdmin && (
                         <button
