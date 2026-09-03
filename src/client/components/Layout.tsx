@@ -20,7 +20,7 @@ const icon = (path: string) => (
 const NAV_ITEMS: NavItem[] = [
   { to: "/", label: "Dashboard", icon: icon("M3 12l9-9 9 9M5 10v10h14V10") },
   { to: "/essensplan", label: "Essensplan", icon: icon("M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z") },
-  { to: "/essen", label: "Essen", icon: icon("M7 2v9a3 3 0 006 0V2M10 2v6M17 2c-1.5 3-1.5 6-1.5 9h3V2M17 11v11") },
+  { to: "/essen", label: "Essen", icon: icon("M7 2v9a3 3 0 006 0V2M10 2v6M10 14v8M17 2c-1.5 3-1.5 6-1.5 9h3V2M17 11v11") },
   { to: "/einkaufsliste", label: "Einkaufsliste", icon: icon("M9 11l2 2 4-4M6 2l1.5 4h13L19 15H8L6 2zM6 2H3M9 21a1 1 0 100-2 1 1 0 000 2zM18 21a1 1 0 100-2 1 1 0 000 2z") },
   { to: "/profil", label: "Profil", icon: icon("M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z") },
   { to: "/admin", label: "Admin", adminOnly: true, icon: icon("M12 2l8 4v6c0 5-3.4 9-8 10-4.6-1-8-5-8-10V6l8-4z") },
