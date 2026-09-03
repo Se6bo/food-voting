@@ -2,13 +2,7 @@ import { Hono } from "hono";
 import type { Env } from "../lib/env";
 import type { AppContext, AppVariables } from "../lib/auth";
 import { requireAuth } from "../lib/auth";
-import {
-  CookidooError,
-  CookidooMigrationMissingError,
-  getCookidooRecipeDetails,
-  isCookidooEnabled,
-  searchCookidooRecipes,
-} from "../lib/cookidoo";
+import { CookidooError, getCookidooRecipeDetails, isCookidooEnabled, searchCookidooRecipes } from "../lib/cookidoo";
 
 const cookidoo = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
@@ -43,31 +37,19 @@ cookidoo.get("/recipes/:id", requireAuth, async (c) => {
 });
 
 /**
- * Login-/Netzwerkfehler gegenüber Cookidoo werden nie mit Details (Zugangs-
- * daten, Stacktraces) an den Client durchgereicht - nur eine verständliche
+ * Fehler gegenüber dem Cookidoo-Proxy werden nie mit Details (Tokens,
+ * Stacktraces) an den Client durchgereicht - nur eine verständliche
  * deutsche Meldung, passend zur zentralen Fehlerkonvention aus index.ts.
- *
- * Die Fehlerarten werden bewusst unterschieden, damit beim nächsten
- * Auftreten ohne Log-Zugriff sofort erkennbar ist, was schiefging:
- *  - fehlende Migration (D1: "no such table"/"no such column") -> 503 mit
- *    Anleitung, statt als generischer 502 zu verschwinden.
- *  - jeder andere `CookidooError` (fehlgeschlagener Login, unerreichbare
- *    Cookidoo-Endpunkte, Cloudflare-Bot-Block, unerwartete Antwortformate,
- *    ...) -> 502, aber mit der konkreten, bereits nutzersicheren
- *    `CookidooError`-Meldung statt eines generischen Fallback-Texts. Alle
+ *  - jeder `CookidooError` (Proxy nicht erreichbar, Proxy meldet einen
+ *    Fehler, unerwartetes Antwortformat, ...) -> 502 mit der konkreten,
+ *    bereits nutzersicheren `CookidooError`-Meldung. Alle
  *    `throw new CookidooError(...)`-Stellen in lib/cookidoo.ts sind bewusst
- *    so formuliert, dass ihre Message gefahrlos an den Client geht (keine
- *    Zugangsdaten, keine Tokens, keine internen URLs mit Secrets).
- *  - alles, was gar kein `CookidooError` ist (unerwarteter/nicht
- *    klassifizierter Fehler, z. B. ein rohes `TypeError`) -> 502 mit
- *    generischer Meldung, weil dessen Message ungeprüft und potenziell
- *    unsicher ist (könnte Stacktrace-artige Details enthalten).
+ *    so formuliert, dass ihre Message gefahrlos an den Client geht.
+ *  - alles, was kein `CookidooError` ist (unerwarteter/nicht klassifizierter
+ *    Fehler) -> 502 mit generischer Meldung, weil dessen Message ungeprüft
+ *    und potenziell unsicher ist (könnte Stacktrace-artige Details enthalten).
  */
 function cookidooErrorResponse(c: AppContext, err: unknown, subject: string) {
-  if (err instanceof CookidooMigrationMissingError) {
-    console.error("Cookidoo-Fehler (Migration fehlt):", err.message);
-    return c.json({ error: err.message }, 503);
-  }
   if (err instanceof CookidooError) {
     console.error("Cookidoo-Fehler:", err.message);
     return c.json({ error: err.message }, 502);

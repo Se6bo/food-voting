@@ -7,12 +7,14 @@ export interface Env {
   /** Optionaler Einladungscode für die Registrierung. */
   SIGNUP_INVITE_CODE?: string;
   /**
-   * Zugangsdaten für den Cookidoo-Import (optional). Nur gesetzt, wenn der
-   * Betreiber den eigenen Cookidoo-Account dafür freigeben möchte - fehlt
-   * eine der beiden Variablen, bleibt das Feature deaktiviert.
+   * Zugriff auf den Cookidoo-Proxy (optional). Der eigentliche Cookidoo-
+   * Login/-Import läuft nicht mehr im Worker, sondern in einem separaten
+   * Node-Dienst auf einem Heimrechner mit normaler Internetleitung (Cookidoo
+   * blockt Anfragen aus Cloudflare-Workers-Rechenzentrums-IPs). Fehlt eine
+   * der beiden Variablen, bleibt das Feature deaktiviert.
    */
-  COOKIDOO_EMAIL?: string;
-  COOKIDOO_PASSWORD?: string;
+  COOKIDOO_PROXY_URL?: string;
+  COOKIDOO_PROXY_TOKEN?: string;
 }
 
 export function isProduction(env: Env): boolean {

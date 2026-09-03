@@ -337,27 +337,54 @@ Danach lässt sich alles noch anpassen, bevor gespeichert wird.
 Das läuft über den **eigenen Cookidoo-Account des Betreibers** (ein Konto für
 die ganze App, nicht pro Benutzer) und eine **inoffizielle, reverse-
 engineerte API** von Vorwerk - es gibt dafür keine öffentliche/offizielle
-Schnittstelle. Das bedeutet konkret:
+Schnittstelle.
+
+### Architektur: Worker → Proxy-Dienst auf einem Heimrechner
+
+Cookidoo/Vorwerk blockt Anfragen, die aus Cloudflare-Workers-Rechenzentrums-
+IPs kommen, mit einem Bot-Schutz-403 - das betrifft auch erfolgreich
+eingeloggte Sessions. Von einer gewöhnlichen Heim-Internetleitung aus
+funktionieren dieselben Aufrufe hingegen. Der komplette Login-/Such-/
+Rezeptdetail-Flow läuft deshalb **nicht mehr im Worker**, sondern in einem
+kleinen, separaten Node.js-Dienst auf einem Heimrechner (dauerhaft laufender
+Prozess, z. B. als systemd-Service). Der Worker ruft nur noch diesen Proxy
+per HTTP auf und reicht dessen (bereits nutzersichere) Fehlermeldungen
+durch:
+
+```
+Cloudflare Worker  --HTTP + Bearer-Token-->  Proxy-Dienst (Heimrechner)  -->  Cookidoo
+```
+
+Die Cookidoo-Zugangsdaten (`COOKIDOO_EMAIL`/`COOKIDOO_PASSWORD`) liegen damit
+**nur noch lokal auf dem Proxy-Rechner** (in dessen `.env`), nie mehr in
+Cloudflare. Der Worker kennt sie gar nicht mehr, sondern nur die Proxy-URL
+und ein separates, rein internes Token.
+
+Das bedeutet konkret:
 
 - Es wird ausschließlich für den privaten Gebrauch des eigenen Abos genutzt.
 - Cookidoo kann seine interne API jederzeit ohne Vorwarnung ändern; der
   Import kann dadurch jederzeit aufhören zu funktionieren, ohne dass diese
   App etwas falsch gemacht hat. Betroffen sind nur Suche und Übernahme -
   der Rest der App läuft unabhängig davon weiter.
-- Ohne gesetzte Zugangsdaten ist das Feature vollständig deaktiviert
-  (`GET /api/cookidoo/status` liefert `{ "enabled": false }`), nichts stürzt ab.
+- Der Import funktioniert nur, solange der Proxy-Rechner an und online ist.
+  Fällt er aus, liefert der Worker eine verständliche Fehlermeldung statt
+  abzustürzen.
+- Ohne gesetzte `COOKIDOO_PROXY_URL`/`COOKIDOO_PROXY_TOKEN` ist das Feature
+  vollständig deaktiviert (`GET /api/cookidoo/status` liefert
+  `{ "enabled": false }`), nichts stürzt ab.
 
 ### Aktivieren
 
 ```bash
-npx wrangler secret put COOKIDOO_EMAIL
-npx wrangler secret put COOKIDOO_PASSWORD
+npx wrangler secret put COOKIDOO_PROXY_URL
+npx wrangler secret put COOKIDOO_PROXY_TOKEN
 npm run deploy
 ```
 
-Für lokale Entwicklung stattdessen `COOKIDOO_EMAIL` und `COOKIDOO_PASSWORD`
-in `.dev.vars` eintragen (bleibt wie gehabt in `.gitignore` und wird nie
-committet).
+Für lokale Entwicklung stattdessen `COOKIDOO_PROXY_URL` und
+`COOKIDOO_PROXY_TOKEN` in `.dev.vars` eintragen (bleibt wie gehabt in
+`.gitignore` und wird nie committet).
 
 ---
 
