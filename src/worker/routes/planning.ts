@@ -1,21 +1,35 @@
 import { Hono } from "hono";
 import type {
   Ingredient,
+  MealSlot,
   PlannedDay,
   PlannedDayProposal,
   VoteValue,
 } from "../../shared/types";
+import { MEAL_SLOTS } from "../../shared/types";
 import type { Env } from "../lib/env";
 import type { AppVariables } from "../lib/auth";
 import { currentUser, requireAuth, requireGroupId } from "../lib/auth";
+import { isMissingMigrationError, MIGRATION_0004_MISSING_MESSAGE } from "../lib/db-errors";
 import { newId } from "../lib/ids";
 import { getSettings } from "../lib/settings";
 import { addDays, isValidIsoDate, todayInZone, votingState } from "../lib/time";
 import { ValidationError, requireString } from "../lib/validation";
 
+/** Validiert einen vom Client geschickten Slot-Wert gegen die drei erlaubten. */
+function requireSlot(value: unknown): MealSlot {
+  if (typeof value === "string" && (MEAL_SLOTS as string[]).includes(value)) {
+    return value as MealSlot;
+  }
+  throw new ValidationError("Ungültiges Zeitfenster.", {
+    slot: "Bitte wähle Mittagessen, Mittagssnack oder Abendessen.",
+  });
+}
+
 interface PlanDayRow {
   id: string;
   date: string;
+  slot: string;
   voting_open: number;
 }
 
@@ -93,7 +107,10 @@ export async function loadPlannedDays(
 ): Promise<PlannedDay[]> {
   const settings = await getSettings(env);
   const { results: planDays } = await env.DB.prepare(
-    "SELECT id, date, voting_open FROM plan_days WHERE group_id = ? AND date >= ? AND date <= ? ORDER BY date ASC",
+    `SELECT id, date, slot, voting_open FROM plan_days
+      WHERE group_id = ? AND date >= ? AND date <= ?
+      ORDER BY date ASC,
+               CASE slot WHEN 'lunch' THEN 0 WHEN 'snack' THEN 1 WHEN 'dinner' THEN 2 ELSE 3 END ASC`,
   )
     .bind(viewer.groupId, range.from, range.to)
     .all<PlanDayRow>();
@@ -201,6 +218,7 @@ export async function loadPlannedDays(
     return {
       id: day.id,
       date: day.date,
+      slot: day.slot as MealSlot,
       proposals: dayProposals,
       // Nur geschlossene Tage haben einen Gewinner.
       winningProposalId: state.open ? null : pickWinner(dayProposals),
@@ -213,14 +231,19 @@ export async function loadPlannedDays(
   });
 }
 
-/** Lädt einen einzelnen Tag - praktisch für Antworten nach Schreibzugriffen. */
+/**
+ * Lädt einen einzelnen Tag+Slot - praktisch für Antworten nach
+ * Schreibzugriffen. Ein Datum allein reicht nicht mehr aus, seit pro Tag bis
+ * zu drei getrennte Slots (Mittagessen/Mittagssnack/Abendessen) existieren.
+ */
 async function loadDay(
   env: Env,
   viewer: { id: string; groupId: string },
   date: string,
+  slot: MealSlot,
 ): Promise<PlannedDay | undefined> {
   const days = await loadPlannedDays(env, viewer, { from: date, to: date });
-  return days[0];
+  return days.find((day) => day.slot === slot);
 }
 
 const planning = new Hono<{ Bindings: Env; Variables: AppVariables }>();
@@ -262,6 +285,7 @@ planning.post("/", async (c) => {
   if (!isValidIsoDate(date)) {
     throw new ValidationError("Ungültiges Datum.", { date: "Bitte wähle ein gültiges Datum." });
   }
+  const slot = requireSlot(body.slot);
   const mealId = requireString(body.mealId, "mealId", { max: 64, label: "Essen" });
 
   const today = todayInZone();
@@ -284,9 +308,9 @@ planning.post("/", async (c) => {
 
   const settings = await getSettings(c.env);
   const existingDay = await c.env.DB.prepare(
-    "SELECT id, voting_open FROM plan_days WHERE group_id = ? AND date = ?",
+    "SELECT id, voting_open FROM plan_days WHERE group_id = ? AND date = ? AND slot = ?",
   )
-    .bind(groupId, date)
+    .bind(groupId, date, slot)
     .first<{ id: string; voting_open: number }>();
 
   let planDayId: string;
@@ -307,11 +331,16 @@ planning.post("/", async (c) => {
     planDayId = existingDay.id;
   } else {
     planDayId = newId();
-    await c.env.DB.prepare(
-      "INSERT INTO plan_days (id, group_id, date) VALUES (?, ?, ?)",
-    )
-      .bind(planDayId, groupId, date)
-      .run();
+    try {
+      await c.env.DB.prepare(
+        "INSERT INTO plan_days (id, group_id, date, slot) VALUES (?, ?, ?, ?)",
+      )
+        .bind(planDayId, groupId, date, slot)
+        .run();
+    } catch (err) {
+      if (isMissingMigrationError(err)) return c.json({ error: MIGRATION_0004_MISSING_MESSAGE }, 503);
+      throw err;
+    }
   }
 
   const existingProposal = await c.env.DB.prepare(
@@ -324,7 +353,7 @@ planning.post("/", async (c) => {
     return c.json({
       ok: true,
       changed: false,
-      day: await loadDay(c.env, { id: user.id, groupId }, date),
+      day: await loadDay(c.env, { id: user.id, groupId }, date, slot),
     });
   }
 
@@ -338,7 +367,7 @@ planning.post("/", async (c) => {
     {
       ok: true,
       changed: true,
-      day: await loadDay(c.env, { id: user.id, groupId }, date),
+      day: await loadDay(c.env, { id: user.id, groupId }, date, slot),
     },
     201,
   );
@@ -375,16 +404,19 @@ planning.put("/:id/voting", async (c) => {
     throw new ValidationError("Ungültiger Wert.", { open: "Ungültiger Wert." });
   }
 
-  const day = await c.env.DB.prepare("SELECT id, date FROM plan_days WHERE id = ? AND group_id = ?")
+  const day = await c.env.DB.prepare("SELECT id, date, slot FROM plan_days WHERE id = ? AND group_id = ?")
     .bind(id, groupId)
-    .first<{ id: string; date: string }>();
+    .first<{ id: string; date: string; slot: string }>();
   if (!day) return c.json({ error: "Diese Planung gibt es nicht (mehr)." }, 404);
 
   await c.env.DB.prepare("UPDATE plan_days SET voting_open = ? WHERE id = ? AND group_id = ?")
     .bind(body.open ? 1 : 0, id, groupId)
     .run();
 
-  return c.json({ ok: true, day: await loadDay(c.env, { id: user.id, groupId }, day.date) });
+  return c.json({
+    ok: true,
+    day: await loadDay(c.env, { id: user.id, groupId }, day.date, day.slot as MealSlot),
+  });
 });
 
 export { planning };

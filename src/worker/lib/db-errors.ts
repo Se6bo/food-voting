@@ -17,3 +17,7 @@ export function isMissingMigrationError(err: unknown): boolean {
 /** Nutzersichere Meldung für fehlende Migration 0002 (Cookidoo-Import). */
 export const MIGRATION_0002_MISSING_MESSAGE =
   "Die Cookidoo-Datenbank-Migration wurde noch nicht angewendet. Bitte migrations/0002_cookidoo.sql per Cloudflare-D1-Konsole ausführen oder `npm run db:migrate` laufen lassen.";
+
+/** Nutzersichere Meldung für fehlende Migration 0004 (Kategorien + Essens-Zeitfenster). */
+export const MIGRATION_0004_MISSING_MESSAGE =
+  "Die Datenbank-Migration für Essenskategorien und Essens-Zeitfenster wurde noch nicht angewendet. Bitte migrations/0004_meal_categories_and_slots.sql per Cloudflare-D1-Konsole ausführen oder `npm run db:migrate` laufen lassen.";

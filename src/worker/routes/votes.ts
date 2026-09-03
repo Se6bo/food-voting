@@ -42,14 +42,20 @@ votes.get("/", async (c) => {
   });
 });
 
-/** Lädt den ganzen Tag eines Vorschlags für die Antwort nach der Abstimmung. */
+/**
+ * Lädt den Tag+Slot eines Vorschlags für die Antwort nach der Abstimmung.
+ * Ein Datum reicht nicht mehr aus, seit pro Tag bis zu drei Slots
+ * (Mittagessen/Mittagssnack/Abendessen) mit je eigenen plan_days-Zeilen
+ * existieren - daher wird gezielt nach der plan_day_id gefiltert.
+ */
 async function loadProposalDay(
   c: { env: Env },
   viewer: { id: string; groupId: string },
   date: string,
+  planDayId: string,
 ) {
-  const [day] = await loadPlannedDays(c.env, viewer, { from: date, to: date });
-  return day;
+  const days = await loadPlannedDays(c.env, viewer, { from: date, to: date });
+  return days.find((day) => day.id === planDayId);
 }
 
 /**
@@ -108,7 +114,7 @@ votes.post("/", async (c) => {
     .bind(newId(), user.id, proposalId, rawVote)
     .run();
 
-  const day = await loadProposalDay(c, { id: user.id, groupId }, proposal.date);
+  const day = await loadProposalDay(c, { id: user.id, groupId }, proposal.date, proposal.plan_day_id);
   return c.json({ ok: true, day });
 });
 
@@ -119,13 +125,13 @@ votes.delete("/:proposalId", async (c) => {
   const proposalId = c.req.param("proposalId");
 
   const proposal = await c.env.DB.prepare(
-    `SELECT mp.id, pd.date, pd.voting_open
+    `SELECT mp.id, pd.id AS plan_day_id, pd.date, pd.voting_open
        FROM meal_proposals mp
        JOIN plan_days pd ON pd.id = mp.plan_day_id
       WHERE mp.id = ? AND pd.group_id = ?`,
   )
     .bind(proposalId, groupId)
-    .first<{ id: string; date: string; voting_open: number }>();
+    .first<{ id: string; plan_day_id: string; date: string; voting_open: number }>();
   if (!proposal) {
     return c.json({ error: "Dieser Vorschlag existiert nicht (mehr)." }, 404);
   }
@@ -140,7 +146,7 @@ votes.delete("/:proposalId", async (c) => {
     .bind(user.id, proposalId)
     .run();
 
-  const day = await loadProposalDay(c, { id: user.id, groupId }, proposal.date);
+  const day = await loadProposalDay(c, { id: user.id, groupId }, proposal.date, proposal.plan_day_id);
   return c.json({ ok: true, day });
 });
 

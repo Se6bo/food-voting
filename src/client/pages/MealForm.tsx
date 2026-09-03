@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import type { IngredientInput, Meal } from "../../shared/types";
+import type { IngredientInput, Meal, MealCategory, MealSlot } from "../../shared/types";
+import { MEAL_SLOTS } from "../../shared/types";
 import { ApiRequestError, api } from "../lib/api";
+import { mealSlotLabel } from "../lib/format";
 import { useToast } from "../lib/toast";
 import { Alert, Button, PageLoader } from "../components/ui";
 
@@ -42,7 +44,16 @@ export function MealFormPage() {
   const [image, setImage] = useState("");
   const [rows, setRows] = useState<IngredientRow[]>([emptyRow()]);
   const [planDate, setPlanDate] = useState("");
+  const [planSlot, setPlanSlot] = useState<MealSlot>("lunch");
   const [cookidooUrl, setCookidooUrl] = useState<string | null>(null);
+
+  // Kategorie
+  const [categories, setCategories] = useState<MealCategory[]>([]);
+  const [categoryId, setCategoryId] = useState("");
+  const [showNewCategory, setShowNewCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [creatingCategory, setCreatingCategory] = useState(false);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
@@ -64,6 +75,32 @@ export function MealFormPage() {
   }, []);
 
   useEffect(() => {
+    api
+      .getOrDefault<{ categories: MealCategory[] }>("/categories", { categories: [] })
+      .then((data) => setCategories(data.categories));
+  }, []);
+
+  async function createCategory() {
+    const trimmed = newCategoryName.trim();
+    if (!trimmed) return;
+    setCreatingCategory(true);
+    setCategoryError(null);
+    try {
+      const { category } = await api.post<{ category: MealCategory }>("/categories", { name: trimmed });
+      setCategories((prev) => [...prev, category].sort((a, b) => a.name.localeCompare(b.name, "de")));
+      setCategoryId(category.id);
+      setNewCategoryName("");
+      setShowNewCategory(false);
+    } catch (err) {
+      setCategoryError(
+        err instanceof ApiRequestError ? err.message : "Die Kategorie konnte nicht angelegt werden.",
+      );
+    } finally {
+      setCreatingCategory(false);
+    }
+  }
+
+  useEffect(() => {
     if (!id) return;
     api
       .get<{ meal: Meal }>(`/meals/${id}`)
@@ -72,6 +109,7 @@ export function MealFormPage() {
         setDescription(meal.description ?? "");
         setImage(meal.image ?? "");
         setCookidooUrl(meal.cookidooUrl);
+        setCategoryId(meal.categoryId ?? "");
         setRows(
           meal.ingredients.length > 0
             ? meal.ingredients.map((ingredient) => ({
@@ -160,6 +198,7 @@ export function MealFormPage() {
       image: image || null,
       ingredients,
       cookidooUrl,
+      categoryId: categoryId || null,
     };
 
     try {
@@ -170,7 +209,7 @@ export function MealFormPage() {
       // Optional direkt einplanen - spart einen zweiten Arbeitsschritt.
       if (!isEdit && planDate) {
         try {
-          await api.post("/planning", { date: planDate, mealId: result.meal.id });
+          await api.post("/planning", { date: planDate, slot: planSlot, mealId: result.meal.id });
           toast.success("Essen erfolgreich hinzugefügt und eingeplant.");
         } catch (err) {
           toast.info(
@@ -332,6 +371,57 @@ export function MealFormPage() {
             />
             {fields.image && <p className="field-error">{fields.image}</p>}
           </div>
+
+          <div>
+            <label className="label" htmlFor="meal-category">
+              Kategorie <span className="font-normal muted">(optional)</span>
+            </label>
+            <div className="flex gap-2">
+              <select
+                id="meal-category"
+                className="input"
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+              >
+                <option value="">Keine Kategorie</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+              <Button type="button" variant="secondary" onClick={() => setShowNewCategory((v) => !v)}>
+                + Neu
+              </Button>
+            </div>
+            {showNewCategory && (
+              <div className="mt-2 flex gap-2">
+                <input
+                  className="input flex-1"
+                  placeholder="Neue Kategorie"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void createCategory();
+                    }
+                  }}
+                  aria-label="Name der neuen Kategorie"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  loading={creatingCategory}
+                  onClick={() => void createCategory()}
+                >
+                  Anlegen
+                </Button>
+              </div>
+            )}
+            {categoryError && <p className="field-error mt-1.5">{categoryError}</p>}
+            {fields.categoryId && <p className="field-error">{fields.categoryId}</p>}
+          </div>
         </section>
 
         <section className="card p-5 sm:p-6">
@@ -422,8 +512,28 @@ export function MealFormPage() {
               value={planDate}
               onChange={(e) => setPlanDate(e.target.value)}
             />
+            {planDate && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {MEAL_SLOTS.map((slot) => (
+                  <button
+                    key={slot}
+                    type="button"
+                    onClick={() => setPlanSlot(slot)}
+                    aria-pressed={planSlot === slot}
+                    className={[
+                      "btn min-h-[44px] whitespace-nowrap border px-3",
+                      planSlot === slot
+                        ? "border-brand-600 bg-brand-600 text-white hover:bg-brand-700 dark:border-brand-500 dark:bg-brand-500 dark:text-slate-950"
+                        : "border-slate-300 bg-white text-slate-700 hover:border-brand-400 hover:bg-brand-50 dark:border-slate-700 dark:bg-[#1a222c] dark:text-slate-200 dark:hover:bg-slate-800",
+                    ].join(" ")}
+                  >
+                    {mealSlotLabel(slot)}
+                  </button>
+                ))}
+              </div>
+            )}
             <p className="mt-1.5 text-sm muted">
-              Wähle einen Tag, dann kann die Gruppe sofort abstimmen.
+              Wähle einen Tag und eine Mahlzeit, dann kann die Gruppe sofort abstimmen.
             </p>
           </section>
         )}

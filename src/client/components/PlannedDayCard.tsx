@@ -1,7 +1,15 @@
 import { useState } from "react";
 import type { PlannedDay, PlannedDayProposal, VoteValue } from "../../shared/types";
 import { ApiRequestError, api } from "../lib/api";
-import { formatAmount, formatDateTime, formatDay, mealEmoji, relativeDayLabel } from "../lib/format";
+import {
+  formatAmount,
+  formatDateTime,
+  formatDay,
+  mealEmoji,
+  mealSlotEmoji,
+  mealSlotLabel,
+  relativeDayLabel,
+} from "../lib/format";
 import { useToast } from "../lib/toast";
 import { Button, ConfirmDialog, Spinner } from "./ui";
 
@@ -32,11 +40,14 @@ export function PlannedDayCard({
   today,
   onChange,
   showIngredients = false,
+  showDate = true,
 }: {
   day: PlannedDay;
   today: string;
   onChange: (day: PlannedDay) => void;
   showIngredients?: boolean;
+  /** Ausblenden, wenn das Datum schon außerhalb der Karte angezeigt wird (z.B. gruppierte Tagesansicht). */
+  showDate?: boolean;
 }) {
   const toast = useToast();
   /** Laufende Abstimmungs-Anfrage ("clear" = eigene Stimme zurücknehmen). */
@@ -107,9 +118,14 @@ export function PlannedDayCard({
     >
       <div className="p-5">
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
-            {formatDay(day.date)}
+          <span className="badge bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+            <span aria-hidden="true">{mealSlotEmoji(day.slot)}</span> {mealSlotLabel(day.slot)}
           </span>
+          {showDate && (
+            <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
+              {formatDay(day.date)}
+            </span>
+          )}
           {relative && (
             <span className="badge bg-brand-100 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
               {relative}

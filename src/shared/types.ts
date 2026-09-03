@@ -9,6 +9,12 @@ export type Role = "user" | "admin";
 /** Vote-Werte: 1 = Ja / gefällt mir, -1 = Nein. */
 export type VoteValue = 1 | -1;
 
+/** Mahlzeiten-Zeitfenster: pro Tag lässt sich jedes davon getrennt planen. */
+export type MealSlot = "lunch" | "snack" | "dinner";
+
+/** Anzeigereihenfolge der drei Zeitfenster eines Tages. */
+export const MEAL_SLOTS: MealSlot[] = ["lunch", "snack", "dinner"];
+
 export interface PublicUser {
   id: string;
   name: string;
@@ -47,6 +53,14 @@ export interface Meal {
   canEdit: boolean;
   /** Link zum Original-Rezept auf Cookidoo, falls aus dem Import übernommen. */
   cookidooUrl: string | null;
+  categoryId: string | null;
+  categoryName: string | null;
+}
+
+/** Essenskategorie einer Gruppe, z.B. "Vegetarisch" oder "Schnell" - erleichtert das Wiederfinden. */
+export interface MealCategory {
+  id: string;
+  name: string;
 }
 
 export interface VoteSummary {
@@ -77,6 +91,8 @@ export interface PlannedDayProposal {
 export interface PlannedDay {
   id: string;
   date: string;
+  /** Welches Zeitfenster des Tages das ist - jedes wird getrennt geplant. */
+  slot: MealSlot;
   /** Beliebig viele Rezeptvorschläge für diesen Tag statt einem festen Essen. */
   proposals: PlannedDayProposal[];
   /**

@@ -4,7 +4,11 @@ import type { Env } from "../lib/env";
 import type { AppVariables } from "../lib/auth";
 import { currentUser, requireAuth, requireGroupId } from "../lib/auth";
 import { newId } from "../lib/ids";
-import { isMissingMigrationError, MIGRATION_0002_MISSING_MESSAGE } from "../lib/db-errors";
+import {
+  isMissingMigrationError,
+  MIGRATION_0002_MISSING_MESSAGE,
+  MIGRATION_0004_MISSING_MESSAGE,
+} from "../lib/db-errors";
 import {
   ValidationError,
   optionalAmount,
@@ -27,6 +31,28 @@ interface MealRow {
   updated_at: string;
   cookidoo_id: string | null;
   cookidoo_url: string | null;
+  category_id: string | null;
+  category_name: string | null;
+}
+
+/**
+ * Prüft, dass eine übergebene Kategorie-ID existiert und zur eigenen Gruppe
+ * gehört - fremde/erfundene IDs würden sonst als "gültig" gespeichert.
+ */
+async function resolveCategoryId(env: Env, groupId: string, raw: unknown): Promise<string | null> {
+  if (raw === null || raw === undefined || raw === "") return null;
+  if (typeof raw !== "string") {
+    throw new ValidationError("Ungültige Kategorie.", { categoryId: "Ungültige Kategorie." });
+  }
+  const row = await env.DB.prepare("SELECT id FROM meal_categories WHERE id = ? AND group_id = ?")
+    .bind(raw, groupId)
+    .first<{ id: string }>();
+  if (!row) {
+    throw new ValidationError("Unbekannte Kategorie.", {
+      categoryId: "Bitte wähle eine vorhandene Kategorie.",
+    });
+  }
+  return raw;
 }
 
 /** Extrahiert die Rezept-ID aus einer Cookidoo-URL (letztes Pfadsegment). */
@@ -81,8 +107,10 @@ export async function loadMeals(
     if (mealIds.length === 0) return [];
     const placeholders = mealIds.map(() => "?").join(", ");
     const { results } = await env.DB.prepare(
-      `SELECT m.*, u.name AS created_by_name
-         FROM meals m LEFT JOIN users u ON u.id = m.created_by
+      `SELECT m.*, u.name AS created_by_name, mc.name AS category_name
+         FROM meals m
+         LEFT JOIN users u ON u.id = m.created_by
+         LEFT JOIN meal_categories mc ON mc.id = m.category_id
         WHERE m.group_id = ? AND m.id IN (${placeholders})`,
     )
       .bind(viewer.groupId, ...mealIds)
@@ -90,8 +118,10 @@ export async function loadMeals(
     mealRows = results;
   } else {
     const { results } = await env.DB.prepare(
-      `SELECT m.*, u.name AS created_by_name
-         FROM meals m LEFT JOIN users u ON u.id = m.created_by
+      `SELECT m.*, u.name AS created_by_name, mc.name AS category_name
+         FROM meals m
+         LEFT JOIN users u ON u.id = m.created_by
+         LEFT JOIN meal_categories mc ON mc.id = m.category_id
         WHERE m.group_id = ?
         ORDER BY m.name COLLATE NOCASE ASC`,
     )
@@ -129,6 +159,8 @@ export async function loadMeals(
     // Berechtigung kommt vom Server, nicht vom Client.
     canEdit: viewer.role === "admin" || row.created_by === viewer.id,
     cookidooUrl: row.cookidoo_url,
+    categoryId: row.category_id,
+    categoryName: row.category_name,
   }));
 }
 
@@ -178,19 +210,26 @@ meals.post("/", async (c) => {
   const ingredients = parseIngredients(body.ingredients);
   const cookidooUrl = optionalCookidooUrl(body.cookidooUrl);
   const cookidooId = cookidooUrl ? extractCookidooId(cookidooUrl) : null;
+  const categoryId = await resolveCategoryId(c.env, groupId, body.categoryId);
 
   const id = newId();
   try {
     await c.env.DB.prepare(
-      "INSERT INTO meals (id, name, description, image, created_by, group_id, cookidoo_id, cookidoo_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO meals (id, name, description, image, created_by, group_id, cookidoo_id, cookidoo_url, category_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
-      .bind(id, name, description, image, user.id, groupId, cookidooId, cookidooUrl)
+      .bind(id, name, description, image, user.id, groupId, cookidooId, cookidooUrl, categoryId)
       .run();
   } catch (err) {
-    // cookidoo_id/cookidoo_url kommen aus migrations/0002_cookidoo.sql - ohne
-    // die Migration schlägt jede Erstellung eines Essens mit einem D1-Fehler
-    // fehl, den wir hier klar von echten Serverfehlern unterscheiden.
-    if (isMissingMigrationError(err)) return c.json({ error: MIGRATION_0002_MISSING_MESSAGE }, 503);
+    // cookidoo_id/cookidoo_url/category_id kommen aus späteren Migrationen -
+    // ohne sie schlägt jede Erstellung eines Essens mit einem D1-Fehler fehl,
+    // den wir hier klar von echten Serverfehlern unterscheiden.
+    if (isMissingMigrationError(err)) {
+      const message = err instanceof Error ? err.message : "";
+      return c.json(
+        { error: /category_id/i.test(message) ? MIGRATION_0004_MISSING_MESSAGE : MIGRATION_0002_MISSING_MESSAGE },
+        503,
+      );
+    }
     throw err;
   }
   if (ingredients.length > 0) await replaceIngredients(c.env, id, ingredients);
@@ -225,16 +264,23 @@ meals.put("/:id", async (c) => {
   const ingredients = parseIngredients(body.ingredients);
   const cookidooUrl = optionalCookidooUrl(body.cookidooUrl);
   const cookidooId = cookidooUrl ? extractCookidooId(cookidooUrl) : null;
+  const categoryId = await resolveCategoryId(c.env, groupId, body.categoryId);
 
   try {
     await c.env.DB.prepare(
       `UPDATE meals SET name = ?, description = ?, image = ?, cookidoo_id = ?, cookidoo_url = ?,
-         updated_at = datetime('now') WHERE id = ?`,
+         category_id = ?, updated_at = datetime('now') WHERE id = ?`,
     )
-      .bind(name, description, image, cookidooId, cookidooUrl, id)
+      .bind(name, description, image, cookidooId, cookidooUrl, categoryId, id)
       .run();
   } catch (err) {
-    if (isMissingMigrationError(err)) return c.json({ error: MIGRATION_0002_MISSING_MESSAGE }, 503);
+    if (isMissingMigrationError(err)) {
+      const message = err instanceof Error ? err.message : "";
+      return c.json(
+        { error: /category_id/i.test(message) ? MIGRATION_0004_MISSING_MESSAGE : MIGRATION_0002_MISSING_MESSAGE },
+        503,
+      );
+    }
     throw err;
   }
   await replaceIngredients(c.env, id, ingredients);

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
-import type { AdminGroup, AppSettings, Meal, Role } from "../../shared/types";
+import type { AdminGroup, AppSettings, Meal, MealSlot, Role } from "../../shared/types";
 import { ApiRequestError, api } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { formatDateOnly, formatDateTime, formatTimestampShort } from "../lib/format";
+import { formatDateOnly, formatDateTime, formatTimestampShort, mealSlotLabel } from "../lib/format";
 import { useToast } from "../lib/toast";
 import { Alert, Button, ConfirmDialog, EmptyState, PageLoader } from "../components/ui";
 
@@ -29,6 +29,7 @@ interface PollProposal {
 interface Poll {
   id: string;
   date: string;
+  slot: MealSlot;
   groupName: string;
   adminOpen: boolean;
   open: boolean;
@@ -500,7 +501,7 @@ function PollsTab() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="font-medium">
-                {formatDateOnly(poll.date)} · {poll.groupName}
+                {formatDateOnly(poll.date)} · {mealSlotLabel(poll.slot)} · {poll.groupName}
               </p>
               <p className="mt-0.5 text-xs muted">
                 {poll.open
