@@ -41,6 +41,7 @@ export function PlannedDayCard({
   onChange,
   showIngredients = false,
   showDate = true,
+  manageVoting = true,
 }: {
   day: PlannedDay;
   today: string;
@@ -48,6 +49,8 @@ export function PlannedDayCard({
   showIngredients?: boolean;
   /** Ausblenden, wenn das Datum schon außerhalb der Karte angezeigt wird (z.B. gruppierte Tagesansicht). */
   showDate?: boolean;
+  /** Blendet die Öffnen/Schließen-Steuerung der Abstimmung aus (z.B. im Dashboard). */
+  manageVoting?: boolean;
 }) {
   const toast = useToast();
   /** Laufende Abstimmungs-Anfrage ("clear" = eigene Stimme zurücknehmen). */
@@ -297,7 +300,7 @@ export function PlannedDayCard({
           {day.votingOpen ? (
             <>
               <p className="text-xs muted">Abstimmen möglich bis {formatDateTime(day.deadline)} Uhr.</p>
-              {day.proposals.length > 0 && (
+              {day.proposals.length > 0 && manageVoting && (
                 <Button
                   type="button"
                   variant="ghost"
@@ -314,7 +317,7 @@ export function PlannedDayCard({
               <p className="rounded-xl bg-slate-50 px-3.5 py-2.5 text-sm muted dark:bg-slate-800/50">
                 {closedMessage(day)}
               </p>
-              {day.closedReason === "admin" && (
+              {day.closedReason === "admin" && manageVoting && (
                 <Button
                   type="button"
                   variant="secondary"

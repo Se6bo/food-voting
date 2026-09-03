@@ -94,7 +94,7 @@ export function DashboardPage() {
 
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {upcoming.slice(0, 6).map((day) => (
-                <PlannedDayCard key={day.id} day={day} today={today} onChange={handleDayChange} />
+                <PlannedDayCard key={day.id} day={day} today={today} onChange={handleDayChange} manageVoting={false} />
               ))}
             </div>
           </section>
