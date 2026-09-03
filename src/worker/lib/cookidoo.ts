@@ -474,6 +474,26 @@ function buildApiUrl(path: string, params?: Record<string, string>): string {
   return url.toString();
 }
 
+// Wird nur serverseitig geloggt (console.error), NIE an den Client
+// durchgereicht - dient allein dazu, im Cloudflare-Logs-Tab sichtbar zu
+// machen, was ein `!res.ok` von der Cookidoo-API (insbesondere ein 403 bei
+// der Suche) tatsächlich zurückliefert, z. B. um eine IP-/ASN-basierte
+// Anti-Bot-Sperre gegen Cloudflare-Workers-Adressen von einem anderen
+// Fehlerursprung zu unterscheiden. Der Body wird nur einmal als Text
+// gelesen (kein `res.json()`-Versuch, der bei nicht-JSON-Antworten selbst
+// scheitern würde).
+async function logCookidooApiFailure(res: Response): Promise<void> {
+  const headers: Record<string, string> = {};
+  for (const [key, value] of res.headers.entries()) headers[key] = value;
+  let bodySnippet: string | undefined;
+  try {
+    bodySnippet = (await res.text()).slice(0, 500);
+  } catch {
+    // Body nicht lesbar - für die Diagnose einfach weglassen.
+  }
+  console.error("Cookidoo-API-403-Diagnose:", { status: res.status, headers, bodySnippet });
+}
+
 async function cookidooApiRequest(
   env: Env,
   path: string,
@@ -490,6 +510,7 @@ async function cookidooApiRequest(
 
   if (res.status === 204) return null;
   if (!res.ok) {
+    await logCookidooApiFailure(res);
     throw new CookidooError(`Cookidoo-Anfrage fehlgeschlagen (Status ${res.status}).`);
   }
   try {
