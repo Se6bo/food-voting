@@ -81,7 +81,7 @@ export function Layout() {
   return (
     <div className="min-h-full">
       {/* Kopfzeile - auf allen Größen sichtbar */}
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/80 backdrop-blur-md dark:border-slate-800 dark:bg-[#0b0f14]/80">
+      <header className="sticky top-0 z-30 border-b border-white/40 bg-white/55 shadow-sm backdrop-blur-xl backdrop-saturate-150 dark:border-white/10 dark:bg-[#0b0f14]/55">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
           <div className="flex items-center gap-3">
             <button
@@ -162,7 +162,7 @@ export function Layout() {
       {/* Tab-Leiste auf Mobile - große Touch-Targets, immer erreichbar */}
       <nav
         aria-label="Schnellnavigation"
-        className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 backdrop-blur-md lg:hidden dark:border-slate-800 dark:bg-[#0b0f14]/95"
+        className="fixed inset-x-0 bottom-0 z-20 border-t border-white/40 bg-white/65 shadow-[0_-4px_16px_rgba(15,23,42,0.08)] backdrop-blur-xl backdrop-saturate-150 lg:hidden dark:border-white/10 dark:bg-[#0b0f14]/65 dark:shadow-[0_-4px_16px_rgba(0,0,0,0.35)]"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <div className="flex">
