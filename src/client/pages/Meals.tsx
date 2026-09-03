@@ -318,6 +318,16 @@ export function MealsPage() {
                       </>
                     )}
                   </div>
+                  {planningMeal?.id === meal.id && (
+                    <PlanMealDialog
+                      open
+                      onClose={() => setPlanningMeal(null)}
+                      onSaved={() => {}}
+                      defaultDate={today}
+                      fixedMeal={{ id: meal.id, name: meal.name }}
+                      variant="inline"
+                    />
+                  )}
                 </div>
               </div>
             </article>
@@ -339,14 +349,6 @@ export function MealsPage() {
         onClose={() => setCategoryManagerOpen(false)}
         categories={categories}
         onChange={setCategories}
-      />
-
-      <PlanMealDialog
-        open={planningMeal !== null}
-        onClose={() => setPlanningMeal(null)}
-        onSaved={() => {}}
-        defaultDate={today}
-        fixedMeal={planningMeal ? { id: planningMeal.id, name: planningMeal.name } : null}
       />
     </div>
   );
