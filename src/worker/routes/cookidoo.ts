@@ -3,7 +3,6 @@ import type { Env } from "../lib/env";
 import type { AppContext, AppVariables } from "../lib/auth";
 import { requireAuth } from "../lib/auth";
 import {
-  CookidooAuthError,
   CookidooError,
   CookidooMigrationMissingError,
   getCookidooRecipeDetails,
@@ -48,30 +47,32 @@ cookidoo.get("/recipes/:id", requireAuth, async (c) => {
  * daten, Stacktraces) an den Client durchgereicht - nur eine verständliche
  * deutsche Meldung, passend zur zentralen Fehlerkonvention aus index.ts.
  *
- * Die drei Fehlerarten werden bewusst unterschieden, damit beim nächsten
+ * Die Fehlerarten werden bewusst unterschieden, damit beim nächsten
  * Auftreten ohne Log-Zugriff sofort erkennbar ist, was schiefging:
  *  - fehlende Migration (D1: "no such table"/"no such column") -> 503 mit
  *    Anleitung, statt als generischer 502 zu verschwinden.
- *  - fehlgeschlagener Cookidoo-Login (falsche Zugangsdaten) -> 502, aber mit
- *    der konkreten, bereits nutzersicheren `CookidooError`-Meldung statt der
- *    generischen Subject-Meldung.
- *  - alles andere (Netzwerk, Cloudflare-Bot-Block, Timeout, ...) -> 502 mit
- *    generischer Meldung wie bisher.
+ *  - jeder andere `CookidooError` (fehlgeschlagener Login, unerreichbare
+ *    Cookidoo-Endpunkte, Cloudflare-Bot-Block, unerwartete Antwortformate,
+ *    ...) -> 502, aber mit der konkreten, bereits nutzersicheren
+ *    `CookidooError`-Meldung statt eines generischen Fallback-Texts. Alle
+ *    `throw new CookidooError(...)`-Stellen in lib/cookidoo.ts sind bewusst
+ *    so formuliert, dass ihre Message gefahrlos an den Client geht (keine
+ *    Zugangsdaten, keine Tokens, keine internen URLs mit Secrets).
+ *  - alles, was gar kein `CookidooError` ist (unerwarteter/nicht
+ *    klassifizierter Fehler, z. B. ein rohes `TypeError`) -> 502 mit
+ *    generischer Meldung, weil dessen Message ungeprüft und potenziell
+ *    unsicher ist (könnte Stacktrace-artige Details enthalten).
  */
 function cookidooErrorResponse(c: AppContext, err: unknown, subject: string) {
   if (err instanceof CookidooMigrationMissingError) {
     console.error("Cookidoo-Fehler (Migration fehlt):", err.message);
     return c.json({ error: err.message }, 503);
   }
-  if (err instanceof CookidooAuthError) {
-    console.error("Cookidoo-Fehler (Login):", err.message);
-    return c.json({ error: err.message }, 502);
-  }
   if (err instanceof CookidooError) {
     console.error("Cookidoo-Fehler:", err.message);
-  } else {
-    console.error("Unerwarteter Cookidoo-Fehler:", err);
+    return c.json({ error: err.message }, 502);
   }
+  console.error("Unerwarteter Cookidoo-Fehler:", err);
   return c.json(
     { error: `${subject} konnte gerade nicht von Cookidoo geladen werden. Bitte versuche es später erneut.` },
     502,

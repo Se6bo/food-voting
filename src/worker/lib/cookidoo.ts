@@ -54,6 +54,32 @@ const LOGIN_USER_AGENT =
 
 const MAX_REDIRECTS = 10;
 
+// Cloudflare kann statt der echten Login-Seite eine Bot-Challenge
+// ("Interstitial"/"Managed Challenge") ausliefern, z. B. weil Anfragen aus
+// gemeinsam genutzten Workers-Rechenzentrums-IPs häufiger als verdächtig
+// eingestuft werden. Das lässt sich anhand öffentlich dokumentierter,
+// stabiler Merkmale der tatsächlichen HTTP-Antwort erkennen (kein Raten):
+//  - Response-Header "cf-mitigated: challenge" - wird von Cloudflare selbst
+//    gesetzt, wenn eine Anfrage mit einer Challenge beantwortet wurde
+//    (siehe Cloudflare-Doku "Detect a Challenge Page response").
+//  - HTML-Titel "Just a moment..." - der Standardtitel der Cloudflare-
+//    Interstitial-Seite.
+//  - Vorkommen von "/cdn-cgi/challenge-platform/" im HTML - der Pfad, unter
+//    dem Cloudflare das Challenge-Skript einbindet.
+// Diese Erkennung entlarvt eine Challenge nur, wenn eines dieser konkreten
+// Merkmale tatsächlich vorliegt; jede andere unerwartete Antwort bleibt bei
+// der bisherigen, allgemeineren Fehlermeldung.
+const CLOUDFLARE_CHALLENGE_MESSAGE =
+  "Cookidoo hat die Anmeldung blockiert (Bot-Schutz). Das kann bei Anfragen aus Cloudflare-Workern " +
+  "gelegentlich vorkommen — bitte später erneut versuchen.";
+
+function isCloudflareChallengeResponse(res: Response, body: string): boolean {
+  if (res.headers.get("cf-mitigated") === "challenge") return true;
+  if (/<title>\s*just a moment/i.test(body)) return true;
+  if (body.includes("/cdn-cgi/challenge-platform/")) return true;
+  return false;
+}
+
 export interface CookidooSearchHit {
   id: string;
   title: string;
@@ -256,10 +282,14 @@ async function fetchLoginPage(
       url = new URL(location, url).toString();
       continue;
     }
+    const body = await res.text().catch(() => "");
+    if (isCloudflareChallengeResponse(res, body)) {
+      throw new CookidooError(CLOUDFLARE_CHALLENGE_MESSAGE);
+    }
     if (res.status !== 200) {
       throw new CookidooError(`Cookidoo-Loginseite nicht erreichbar (Status ${res.status}).`);
     }
-    return await res.text();
+    return body;
   }
   throw new CookidooError("Cookidoo-Login: zu viele Weiterleitungen beim Laden der Loginseite.");
 }
