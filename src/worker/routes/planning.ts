@@ -361,4 +361,30 @@ planning.delete("/:id", async (c) => {
   return c.json({ ok: true });
 });
 
+/**
+ * Abstimmung eines Tages vorzeitig schließen oder wieder öffnen - für jedes
+ * Mitglied der eigenen Gruppe, nicht nur für Admins (die haben zusätzlich
+ * den gleichwertigen Weg über /api/admin/votes/:id).
+ */
+planning.put("/:id/voting", async (c) => {
+  const user = currentUser(c);
+  const groupId = requireGroupId(user);
+  const id = c.req.param("id");
+  const body = await c.req.json().catch(() => ({}));
+  if (typeof body.open !== "boolean") {
+    throw new ValidationError("Ungültiger Wert.", { open: "Ungültiger Wert." });
+  }
+
+  const day = await c.env.DB.prepare("SELECT id, date FROM plan_days WHERE id = ? AND group_id = ?")
+    .bind(id, groupId)
+    .first<{ id: string; date: string }>();
+  if (!day) return c.json({ error: "Diese Planung gibt es nicht (mehr)." }, 404);
+
+  await c.env.DB.prepare("UPDATE plan_days SET voting_open = ? WHERE id = ? AND group_id = ?")
+    .bind(body.open ? 1 : 0, id, groupId)
+    .run();
+
+  return c.json({ ok: true, day: await loadDay(c.env, { id: user.id, groupId }, day.date) });
+});
+
 export { planning };

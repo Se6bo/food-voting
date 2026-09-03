@@ -3,7 +3,7 @@ import type { PlannedDay, PlannedDayProposal, VoteValue } from "../../shared/typ
 import { ApiRequestError, api } from "../lib/api";
 import { formatAmount, formatDateTime, formatDay, mealEmoji, relativeDayLabel } from "../lib/format";
 import { useToast } from "../lib/toast";
-import { Spinner } from "./ui";
+import { Button, ConfirmDialog, Spinner } from "./ui";
 
 /** Verständlicher Text dazu, warum eine Abstimmung geschlossen ist. */
 function closedMessage(day: PlannedDay): string {
@@ -43,6 +43,10 @@ export function PlannedDayCard({
   const [pending, setPending] = useState<{ proposalId: string; action: VoteValue | "clear" } | null>(null);
   /** Aufgeklappte Zutatenlisten je Vorschlag. */
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  /** Bestätigungsdialog fürs vorzeitige Schließen. */
+  const [confirmClose, setConfirmClose] = useState(false);
+  /** Laufende Öffnen/Schließen-Anfrage - getrennt vom Abstimmen-Pending. */
+  const [votingBusy, setVotingBusy] = useState(false);
 
   async function vote(proposal: PlannedDayProposal, value: VoteValue) {
     if (pending) return;
@@ -68,6 +72,26 @@ export function PlannedDayCard({
       );
     } finally {
       setPending(null);
+    }
+  }
+
+  /**
+   * Abstimmung des Tages schließen oder wieder öffnen - jedes Gruppenmitglied
+   * darf das, nicht nur Admins (siehe /api/planning/:id/voting).
+   */
+  async function setVotingOpen(open: boolean) {
+    if (votingBusy) return;
+    setVotingBusy(true);
+    try {
+      const result = await api.put<{ day: PlannedDay }>(`/planning/${day.id}/voting`, { open });
+      onChange(result.day);
+      toast.success(open ? "Die Abstimmung wurde wieder geöffnet." : "Die Abstimmung wurde beendet.");
+    } catch (err) {
+      toast.error(
+        err instanceof ApiRequestError ? err.message : "Das hat leider nicht geklappt.",
+      );
+    } finally {
+      setVotingBusy(false);
     }
   }
 
@@ -187,7 +211,7 @@ export function PlannedDayCard({
                           <button
                             type="button"
                             onClick={() => vote(proposal, 1)}
-                            disabled={pending !== null}
+                            disabled={pending !== null || votingBusy}
                             aria-pressed={proposal.myVote === 1}
                             aria-label={`Dafür stimmen – ${proposal.votes.yes} ${
                               proposal.votes.yes === 1 ? "Ja-Stimme" : "Ja-Stimmen"
@@ -208,7 +232,7 @@ export function PlannedDayCard({
                           <button
                             type="button"
                             onClick={() => vote(proposal, -1)}
-                            disabled={pending !== null}
+                            disabled={pending !== null || votingBusy}
                             aria-pressed={proposal.myVote === -1}
                             aria-label={`Dagegen stimmen – ${proposal.votes.no} ${
                               proposal.votes.no === 1 ? "Nein-Stimme" : "Nein-Stimmen"
@@ -255,14 +279,54 @@ export function PlannedDayCard({
 
         <div className="mt-4">
           {day.votingOpen ? (
-            <p className="text-xs muted">Abstimmen möglich bis {formatDateTime(day.deadline)} Uhr.</p>
+            <>
+              <p className="text-xs muted">Abstimmen möglich bis {formatDateTime(day.deadline)} Uhr.</p>
+              {day.proposals.length > 0 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="mt-2 min-h-[44px]"
+                  onClick={() => setConfirmClose(true)}
+                  disabled={pending !== null || votingBusy}
+                >
+                  Abstimmung jetzt beenden
+                </Button>
+              )}
+            </>
           ) : (
-            <p className="rounded-xl bg-slate-50 px-3.5 py-2.5 text-sm muted dark:bg-slate-800/50">
-              {closedMessage(day)}
-            </p>
+            <div className="space-y-2">
+              <p className="rounded-xl bg-slate-50 px-3.5 py-2.5 text-sm muted dark:bg-slate-800/50">
+                {closedMessage(day)}
+              </p>
+              {day.closedReason === "admin" && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="min-h-[44px]"
+                  onClick={() => setVotingOpen(true)}
+                  loading={votingBusy}
+                  disabled={pending !== null || votingBusy}
+                >
+                  Abstimmung wieder öffnen
+                </Button>
+              )}
+            </div>
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmClose}
+        title="Abstimmung jetzt beenden?"
+        message={`Wenn du die Abstimmung für ${formatDay(day.date)} jetzt beendest, steht sofort der aktuell führende Vorschlag als Gewinner fest und niemand kann mehr abstimmen.`}
+        confirmLabel="Abstimmung beenden"
+        onConfirm={async () => {
+          await setVotingOpen(false);
+          setConfirmClose(false);
+        }}
+        onCancel={() => setConfirmClose(false)}
+        busy={votingBusy}
+      />
     </article>
   );
 }
