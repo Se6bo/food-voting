@@ -98,24 +98,6 @@ export function DashboardPage() {
               ))}
             </div>
           </section>
-
-          <section className="grid gap-4 sm:grid-cols-3">
-            <Link to="/essen/neu" className="card group p-5 transition-shadow hover:shadow-card-hover">
-              <span className="text-2xl" aria-hidden="true">➕</span>
-              <h3 className="mt-2 font-semibold">Essen hinzufügen</h3>
-              <p className="mt-1 text-sm muted">Neues Gericht mit Zutaten anlegen.</p>
-            </Link>
-            <Link to="/essensplan" className="card group p-5 transition-shadow hover:shadow-card-hover">
-              <span className="text-2xl" aria-hidden="true">📅</span>
-              <h3 className="mt-2 font-semibold">Essensplan</h3>
-              <p className="mt-1 text-sm muted">Alle geplanten Tage im Überblick.</p>
-            </Link>
-            <Link to="/einkaufsliste" className="card group p-5 transition-shadow hover:shadow-card-hover">
-              <span className="text-2xl" aria-hidden="true">🛒</span>
-              <h3 className="mt-2 font-semibold">Einkaufsliste</h3>
-              <p className="mt-1 text-sm muted">Automatisch aus dem Plan erzeugt.</p>
-            </Link>
-          </section>
         </>
       )}
     </div>
