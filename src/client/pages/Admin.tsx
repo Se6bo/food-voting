@@ -448,6 +448,7 @@ function PollsTab() {
   const [polls, setPolls] = useState<Poll[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [pendingClose, setPendingClose] = useState<Poll | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -466,8 +467,7 @@ function PollsTab() {
     void load();
   }, [load]);
 
-  async function toggleOpen(poll: Poll) {
-    const next = !poll.adminOpen;
+  async function toggleOpen(poll: Poll, next: boolean) {
     setBusyId(poll.id);
     try {
       await api.put(`/admin/votes/${poll.id}`, { open: next });
@@ -479,6 +479,15 @@ function PollsTab() {
     } finally {
       setBusyId(null);
     }
+  }
+
+  // Vorzeitiges Schließen legt sofort den Gewinner fest und lässt niemanden
+  // mehr abstimmen - dafür erst nach Bestätigung ausführen. Wieder-Öffnen ist
+  // unkritisch (jederzeit reversibel) und läuft weiterhin ohne Zwischenschritt.
+  async function confirmClose() {
+    if (!pendingClose) return;
+    await toggleOpen(pendingClose, false);
+    setPendingClose(null);
   }
 
   if (loading) return <PageLoader label="Abstimmungen werden geladen ..." />;
@@ -505,7 +514,7 @@ function PollsTab() {
             </div>
             <Button
               variant="secondary"
-              onClick={() => toggleOpen(poll)}
+              onClick={() => (poll.adminOpen ? setPendingClose(poll) : toggleOpen(poll, true))}
               loading={busyId === poll.id}
               disabled={busyId !== null}
             >
@@ -548,6 +557,20 @@ function PollsTab() {
           )}
         </div>
       ))}
+
+      <ConfirmDialog
+        open={pendingClose !== null}
+        title="Abstimmung vorzeitig beenden?"
+        message={
+          pendingClose
+            ? `Wenn du die Abstimmung für ${formatDateOnly(pendingClose.date)} jetzt vorzeitig beendest, steht sofort der aktuell führende Vorschlag als Gewinner fest und niemand kann mehr abstimmen.`
+            : ""
+        }
+        confirmLabel="Abstimmung beenden"
+        onConfirm={confirmClose}
+        onCancel={() => setPendingClose(null)}
+        busy={busyId === pendingClose?.id}
+      />
     </div>
   );
 }

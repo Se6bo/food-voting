@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { AdminGroup } from "../../shared/types";
 import type { Env } from "../lib/env";
 import type { AppVariables } from "../lib/auth";
-import { currentUser, destroyAllSessionsFor, requireAdmin } from "../lib/auth";
+import { currentUser, destroyAllSessionsFor, requireAdmin, requireGroupId } from "../lib/auth";
 import { newId, newToken } from "../lib/ids";
 import { getSettings, updateSettings } from "../lib/settings";
 import { addDays, todayInZone, votingState } from "../lib/time";
@@ -193,6 +193,7 @@ interface PollProposalRow {
 }
 
 admin.get("/votes", async (c) => {
+  const groupId = requireGroupId(currentUser(c));
   const settings = await getSettings(c.env);
   const today = todayInZone();
   const from = c.req.query("from") ?? addDays(today, -14);
@@ -202,10 +203,10 @@ admin.get("/votes", async (c) => {
     `SELECT pd.id, pd.date, pd.voting_open, g.name AS group_name
        FROM plan_days pd
        JOIN groups g ON g.id = pd.group_id
-      WHERE pd.date >= ? AND pd.date <= ?
+      WHERE pd.date >= ? AND pd.date <= ? AND pd.group_id = ?
       ORDER BY pd.date ASC`,
   )
-    .bind(from, to)
+    .bind(from, to, groupId)
     .all<{ id: string; date: string; voting_open: number; group_name: string }>();
 
   let proposals: PollProposalRow[] = [];
@@ -301,14 +302,17 @@ admin.get("/votes", async (c) => {
 
 /** Abstimmung eines Tages manuell schließen oder wieder öffnen. */
 admin.put("/votes/:id", async (c) => {
+  const groupId = requireGroupId(currentUser(c));
   const id = c.req.param("id");
   const body = await c.req.json().catch(() => ({}));
   if (typeof body.open !== "boolean") {
     throw new ValidationError("Ungültiger Wert.", { open: "Ungültiger Wert." });
   }
 
-  const result = await c.env.DB.prepare("UPDATE plan_days SET voting_open = ? WHERE id = ?")
-    .bind(body.open ? 1 : 0, id)
+  const result = await c.env.DB.prepare(
+    "UPDATE plan_days SET voting_open = ? WHERE id = ? AND group_id = ?",
+  )
+    .bind(body.open ? 1 : 0, id, groupId)
     .run();
   if (!result.meta.changes) return c.json({ error: "Diese Abstimmung existiert nicht." }, 404);
   return c.json({ ok: true });
