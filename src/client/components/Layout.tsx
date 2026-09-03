@@ -64,6 +64,13 @@ export function Layout() {
 
   const items = NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin);
 
+  // Für die schwebende Glas-Tableiste: welches der ersten 4 Icons ist aktiv (-1 = keins,
+  // z.B. auf /profil oder /admin), damit der Farb-Pill weiß, wohin er gleiten muss.
+  const mobileNavItems = items.slice(0, 4);
+  const activeMobileIndex = mobileNavItems.findIndex((item) =>
+    item.to === "/" ? location.pathname === "/" : location.pathname.startsWith(item.to),
+  );
+
   async function handleLogout() {
     await logout();
     toast.info("Du wurdest abgemeldet.");
@@ -159,29 +166,47 @@ export function Layout() {
         </div>
       )}
 
-      {/* Tab-Leiste auf Mobile - große Touch-Targets, immer erreichbar */}
+      {/* Schwebende Glas-Tableiste auf Mobile - große Touch-Targets, immer erreichbar */}
       <nav
         aria-label="Schnellnavigation"
-        className="fixed inset-x-0 bottom-0 z-20 border-t border-white/40 bg-white/65 shadow-[0_-4px_16px_rgba(15,23,42,0.08)] backdrop-blur-xl backdrop-saturate-150 lg:hidden dark:border-white/10 dark:bg-[#0b0f14]/65 dark:shadow-[0_-4px_16px_rgba(0,0,0,0.35)]"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        className="fixed inset-x-3 z-20 lg:hidden"
+        style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
       >
-        <div className="flex">
-          {items.slice(0, 4).map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === "/"}
-              className={({ isActive }) =>
-                [
-                  "flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors",
-                  isActive ? "text-brand-600 dark:text-brand-400" : "text-slate-500 dark:text-slate-400",
-                ].join(" ")
-              }
-            >
-              {item.icon}
-              {item.label}
-            </NavLink>
-          ))}
+        <div className="mx-auto max-w-md rounded-full border border-white/40 bg-white/65 p-1.5 shadow-[0_8px_28px_rgba(15,23,42,0.18)] backdrop-blur-xl backdrop-saturate-150 dark:border-white/10 dark:bg-[#0b0f14]/65 dark:shadow-[0_8px_28px_rgba(0,0,0,0.55)]">
+          <div className="relative flex items-center gap-1">
+            <span
+              aria-hidden="true"
+              className="absolute inset-y-0 left-0 rounded-full bg-brand-500 shadow-sm transition-transform duration-300 ease-out"
+              style={{
+                width: `${100 / mobileNavItems.length}%`,
+                transform: `translateX(${Math.max(activeMobileIndex, 0) * 100}%)`,
+                opacity: activeMobileIndex >= 0 ? 1 : 0,
+              }}
+            />
+            {mobileNavItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === "/"}
+                className="relative z-10 flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium"
+              >
+                {({ isActive }) => (
+                  <>
+                    <span
+                      className={`transition-colors duration-300 ${isActive ? "text-white" : "text-slate-500 dark:text-slate-400"}`}
+                    >
+                      {item.icon}
+                    </span>
+                    <span
+                      className={`transition-colors duration-300 ${isActive ? "text-white" : "text-slate-500 dark:text-slate-400"}`}
+                    >
+                      {item.label}
+                    </span>
+                  </>
+                )}
+              </NavLink>
+            ))}
+          </div>
         </div>
       </nav>
     </div>
