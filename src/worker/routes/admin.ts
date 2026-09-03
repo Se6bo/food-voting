@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { AdminGroup } from "../../shared/types";
+import type { AdminGroup, MealSlot } from "../../shared/types";
 import type { Env } from "../lib/env";
 import type { AppVariables } from "../lib/auth";
 import { currentUser, destroyAllSessionsFor, requireAdmin, requireGroupId } from "../lib/auth";
@@ -200,14 +200,15 @@ admin.get("/votes", async (c) => {
   const to = c.req.query("to") ?? addDays(today, settings.planningDaysAhead);
 
   const { results: days } = await c.env.DB.prepare(
-    `SELECT pd.id, pd.date, pd.voting_open, g.name AS group_name
+    `SELECT pd.id, pd.date, pd.slot, pd.voting_open, g.name AS group_name
        FROM plan_days pd
        JOIN groups g ON g.id = pd.group_id
       WHERE pd.date >= ? AND pd.date <= ? AND pd.group_id = ?
-      ORDER BY pd.date ASC`,
+      ORDER BY pd.date ASC,
+               CASE pd.slot WHEN 'lunch' THEN 0 WHEN 'snack' THEN 1 WHEN 'dinner' THEN 2 ELSE 3 END ASC`,
   )
     .bind(from, to, groupId)
-    .all<{ id: string; date: string; voting_open: number; group_name: string }>();
+    .all<{ id: string; date: string; slot: string; voting_open: number; group_name: string }>();
 
   let proposals: PollProposalRow[] = [];
   let votes: Array<{ proposal_id: string; vote: number }> = [];
@@ -288,6 +289,7 @@ admin.get("/votes", async (c) => {
       return {
         id: day.id,
         date: day.date,
+        slot: day.slot as MealSlot,
         groupName: day.group_name,
         adminOpen: day.voting_open === 1,
         open: state.open,

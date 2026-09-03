@@ -7,6 +7,7 @@ import { getSettings } from "./lib/settings";
 import { ValidationError } from "./lib/validation";
 import { APP_TIMEZONE, todayInZone } from "./lib/time";
 import { auth } from "./routes/auth";
+import { categories } from "./routes/categories";
 import { groups } from "./routes/groups";
 import { meals } from "./routes/meals";
 import { planning } from "./routes/planning";
@@ -44,6 +45,7 @@ api.get("/settings", requireAuth, async (c) => {
 api.route("/auth", auth);
 api.route("/groups", groups);
 api.route("/meals", meals);
+api.route("/categories", categories);
 api.route("/planning", planning);
 api.route("/votes", votes);
 api.route("/shopping-list", shopping);

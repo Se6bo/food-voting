@@ -3,6 +3,8 @@
  * damit ein Benutzer im Urlaub dieselbe Deadline sieht wie zuhause.
  */
 
+import type { MealSlot } from "../../shared/types";
+
 export const APP_TIMEZONE = "Europe/Berlin";
 
 const weekdayLong = new Intl.DateTimeFormat("de-DE", {
@@ -108,4 +110,24 @@ export function mealEmoji(name: string): string {
     if (pattern.test(name)) return emoji;
   }
   return "🍽️";
+}
+
+const MEAL_SLOT_LABELS: Record<MealSlot, string> = {
+  lunch: "Mittagessen",
+  snack: "Mittagssnack",
+  dinner: "Abendessen",
+};
+
+const MEAL_SLOT_EMOJI: Record<MealSlot, string> = {
+  lunch: "🍽️",
+  snack: "🍎",
+  dinner: "🌙",
+};
+
+export function mealSlotLabel(slot: MealSlot): string {
+  return MEAL_SLOT_LABELS[slot];
+}
+
+export function mealSlotEmoji(slot: MealSlot): string {
+  return MEAL_SLOT_EMOJI[slot];
 }
