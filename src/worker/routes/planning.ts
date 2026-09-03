@@ -266,7 +266,13 @@ planning.get("/", async (c) => {
   const from = fromParam && isValidIsoDate(fromParam) ? fromParam : today;
   const to = toParam && isValidIsoDate(toParam) ? toParam : addDays(today, settings.planningDaysAhead);
 
-  const days = await loadPlannedDays(c.env, { id: user.id, groupId }, { from, to });
+  let days: PlannedDay[];
+  try {
+    days = await loadPlannedDays(c.env, { id: user.id, groupId }, { from, to });
+  } catch (err) {
+    if (isMissingMigrationError(err)) return c.json({ error: MIGRATION_0004_MISSING_MESSAGE }, 503);
+    throw err;
+  }
   return c.json({ days, range: { from, to }, today });
 });
 
