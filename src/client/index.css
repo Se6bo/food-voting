@@ -15,10 +15,27 @@
   }
 
   body {
-    @apply bg-slate-50 text-slate-900 antialiased;
-    @apply dark:bg-[#0b0f14] dark:text-slate-100;
+    @apply text-slate-900 antialiased;
+    @apply dark:text-slate-100;
+    /* Sehr dezenter Verlauf statt Vollton: backdrop-blur/-saturate an den
+       transluzenten .card-Flächen wirkt nur, wenn dahinter etwas
+       Nicht-Uniformes liegt (bei Header/Footer übernimmt das der
+       durchscrollende Inhalt). Im Hauptbereich übernimmt das dieser sanfte
+       Gradient - bewusst nur ein Hauch Brand-Grün, kein Muster/Bild, damit
+       nichts wie ein buntes Poster wirkt. */
+    background-color: #f8fafc;
+    background-image: radial-gradient(circle at 12% 0%, rgba(48, 148, 100, 0.08), transparent 55%),
+      linear-gradient(180deg, #f8fafc 0%, #eef6f1 45%, #f1f5f9 100%);
+    background-attachment: fixed;
     font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
       "Helvetica Neue", Arial, sans-serif;
+  }
+
+  .dark body {
+    background-color: #0b0f14;
+    background-image: radial-gradient(circle at 12% 0%, rgba(48, 148, 100, 0.1), transparent 55%),
+      linear-gradient(180deg, #0b0f14 0%, #0d1712 45%, #0b0f14 100%);
+    background-attachment: fixed;
   }
 
   /* Sichtbarer Fokus für Tastaturbedienung - nie wegoptimieren. */
@@ -29,8 +46,14 @@
 
 @layer components {
   .card {
-    @apply rounded-2xl border border-slate-200 bg-white shadow-card;
-    @apply dark:border-slate-800 dark:bg-[#141a22];
+    /* Liquid-Glass-Look, dieselben Tokens wie Header/Footer in Layout.tsx
+       (border-white/40, backdrop-blur-xl + backdrop-saturate-150, weicher
+       Schatten). Alpha bewusst hoeher als beim Footer (0.65) gewaehlt, weil
+       Karten hier oft dichten Flieszttext/Formulare/Tabellen tragen und
+       ausreichend Kontrast brauchen (siehe Bericht fuer Kontrast-Nachweis). */
+    @apply rounded-2xl border border-white/40 bg-white/80 shadow-[0_8px_24px_rgba(15,23,42,0.10)];
+    @apply backdrop-blur-xl backdrop-saturate-150;
+    @apply dark:border-white/10 dark:bg-[#0b0f14]/80 dark:shadow-[0_8px_24px_rgba(0,0,0,0.35)];
   }
 
   .btn {
