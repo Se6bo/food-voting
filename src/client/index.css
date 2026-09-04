@@ -50,10 +50,21 @@
        (border-white/40, backdrop-blur-xl + backdrop-saturate-150, weicher
        Schatten). Alpha bewusst hoeher als beim Footer (0.65) gewaehlt, weil
        Karten hier oft dichten Flieszttext/Formulare/Tabellen tragen und
-       ausreichend Kontrast brauchen (siehe Bericht fuer Kontrast-Nachweis). */
-    @apply rounded-2xl border border-white/40 bg-white/80 shadow-[0_8px_24px_rgba(15,23,42,0.10)];
+       ausreichend Kontrast brauchen (siehe Bericht fuer Kontrast-Nachweis).
+       Auf schmalen Viewports (Mobile) gibt es kaum sichtbaren Seitenhintergrund
+       um die Karten (px-4 in Layout.tsx), an dem die Transparenz "durchscheinen"
+       koennte - der Glas-Effekt darf sich deshalb nicht nur auf Durchschein-
+       Transparenz verlassen. Zusaetzlich zur Border ein klassischer Glas-
+       Highlight: ein heller innerer Rand oben (inset 0 1px 0) simuliert die
+       Lichtkante einer Glasscheibe unabhaengig vom Hintergrund; der Schatten
+       ist kraeftiger, damit die Karte spuerbar "schwebt" statt nur leicht
+       getoent zu wirken. Border-Opacity leicht angehoben fuer eine klarere
+       Kante auf jedem Untergrund. */
+    @apply rounded-2xl border border-white/50 bg-white/80;
+    @apply shadow-[inset_0_1px_0_rgba(255,255,255,0.65),0_12px_32px_rgba(15,23,42,0.16)];
     @apply backdrop-blur-xl backdrop-saturate-150;
-    @apply dark:border-white/10 dark:bg-[#0b0f14]/80 dark:shadow-[0_8px_24px_rgba(0,0,0,0.35)];
+    @apply dark:border-white/15 dark:bg-[#0b0f14]/80;
+    @apply dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_12px_32px_rgba(0,0,0,0.45)];
   }
 
   .btn {
